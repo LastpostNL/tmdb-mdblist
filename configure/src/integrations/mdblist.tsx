@@ -5,8 +5,14 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 
 export default function MDBListIntegration() {
-  const { config, setConfig } = useConfig()
-  const [tokenInput, setTokenInput] = useState(config.mdblistkey || '')
+  const {
+    mdblistkey,
+    setMdblistkey,
+    catalogs,
+    setCatalogs
+  } = useConfig()
+
+  const [tokenInput, setTokenInput] = useState(mdblistkey || '')
   const [status, setStatus] = useState<'idle' | 'loading' | 'error' | 'success'>('idle')
   const [error, setError] = useState<string | null>(null)
 
@@ -20,6 +26,7 @@ export default function MDBListIntegration() {
 
       const lists = await res.json()
 
+      // Maak een nieuw object voor mdblist-lijsten
       const newLists: any = { movie: {}, series: {} }
 
       for (const list of lists) {
@@ -31,14 +38,27 @@ export default function MDBListIntegration() {
         }
       }
 
-      setConfig({
-        ...config,
-        mdblistkey: tokenInput,
-        lists: {
-          ...config.lists,
-          mdblist: newLists
-        }
-      })
+      setMdblistkey(tokenInput)
+
+      // Update catalogs zodat mdblist lijsten er ook in staan,
+      // dit is afhankelijk van jouw structuur, maar bijvoorbeeld:
+      setCatalogs([
+        ...catalogs.filter(c => !c.id.startsWith('mdblist.')),
+        ...Object.entries(newLists.movie).map(([id, val]) => ({
+          id: `mdblist.${id}`,
+          type: 'movie',
+          name: val.name,
+          enabled: val.enabled,
+          showInHome: val.home,
+        })),
+        ...Object.entries(newLists.series).map(([id, val]) => ({
+          id: `mdblist.${id}`,
+          type: 'series',
+          name: val.name,
+          enabled: val.enabled,
+          showInHome: val.home,
+        }))
+      ])
 
       setStatus('success')
     } catch (err: any) {
@@ -69,7 +89,7 @@ export default function MDBListIntegration() {
         <p className="text-red-600">Fout: {error}</p>
       )}
 
-      {config.mdblistkey && status !== 'loading' && (
+      {mdblistkey && status !== 'loading' && (
         <p className="text-sm text-gray-500">Je bent ingelogd bij MDBList.</p>
       )}
     </Card>
