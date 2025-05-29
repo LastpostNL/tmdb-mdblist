@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 
 export default function MDBListIntegration() {
   const { config, setConfig } = useConfig()
-  const [tokenInput, setTokenInput] = useState(config.mdblistUserToken || '')
+  const [tokenInput, setTokenInput] = useState(config.mdblistkey || '')
   const [status, setStatus] = useState<'idle' | 'loading' | 'error' | 'success'>('idle')
   const [error, setError] = useState<string | null>(null)
 
@@ -33,7 +33,7 @@ export default function MDBListIntegration() {
 
       setConfig({
         ...config,
-        mdblistUserToken: tokenInput,
+        mdblistkey: tokenInput,
         lists: {
           ...config.lists,
           mdblist: newLists
@@ -69,7 +69,7 @@ export default function MDBListIntegration() {
         <p className="text-red-600">Fout: {error}</p>
       )}
 
-      {config.mdblistUserToken && status !== 'loading' && (
+      {config.mdblistkey && status !== 'loading' && (
         <p className="text-sm text-gray-500">Je bent ingelogd bij MDBList.</p>
       )}
     </Card>
