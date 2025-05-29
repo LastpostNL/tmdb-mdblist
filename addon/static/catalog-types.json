@@ -48,7 +48,13 @@
       ]
     }
   },
- "streaming": {
+  "mdblist": {
+    "name": "MDBList",
+    "icon": "mdblist-icon.png",
+    "description": "Persoonlijke lijsten van MDBList",
+    "catalogIdPrefix": "mdblist."
+  },
+  "streaming": {
     "nfx": {
       "nameKey": "nfx",
       "watchProviderId": 8,
