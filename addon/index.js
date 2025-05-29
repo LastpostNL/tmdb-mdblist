@@ -15,6 +15,11 @@ const { getRequestToken, getSessionId } = require("./lib/getSession");
 const { getFavorites, getWatchList } = require("./lib/getPersonalLists");
 const { blurImage } = require('./utils/imageProcessor');
 
+// We gaan er vanuit dat globale fetch beschikbaar is (Node 18+ of polyfill)
+if (typeof fetch === "undefined") {
+  global.fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+}
+
 addon.use(analytics.middleware);
 addon.use(favicon(path.join(__dirname, '../public/favicon.png')));
 addon.use(express.static(path.join(__dirname, '../public')));
@@ -77,16 +82,16 @@ addon.get('/:catalogChoices?/configure', function (req, res) {
 });
 
 addon.get("/:catalogChoices?/manifest.json", async function (req, res) {
-    const { catalogChoices } = req.params;
-    const config = parseConfig(catalogChoices);
-    const manifest = await getManifest(config);
-    
-    const cacheOpts = {
-        cacheMaxAge: 12 * 60 * 60,
-        staleRevalidate: 14 * 24 * 60 * 60, 
-        staleError: 30 * 24 * 60 * 60, 
-    };
-    respond(res, manifest, cacheOpts);
+  const { catalogChoices } = req.params;
+  const config = parseConfig(catalogChoices);
+  const manifest = await getManifest(config);
+  
+  const cacheOpts = {
+    cacheMaxAge: 12 * 60 * 60,
+    staleRevalidate: 14 * 24 * 60 * 60, 
+    staleError: 30 * 24 * 60 * 60, 
+  };
+  respond(res, manifest, cacheOpts);
 });
 
 addon.get("/:catalogChoices?/catalog/:type/:id/:extra?.json", async function (req, res) {
@@ -217,6 +222,27 @@ addon.get("/api/image/blur", async function (req, res) {
   } catch (error) {
     console.error('Erro na rota de blur:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// MDBList user lists route
+addon.get('/mdblist/lists/user', async (req, res) => {
+  const apikey = req.query.apikey;
+  if (!apikey) {
+    return res.status(400).json({ error: 'API key is vereist' });
+  }
+
+  try {
+    const url = `https://api.mdblist.com/lists/user?apikey=${apikey}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      return res.status(response.status).json({ error: 'Fout bij ophalen van lijsten van MDBList' });
+    }
+    const lists = await response.json();
+    res.json(lists);
+  } catch (error) {
+    console.error('Fout bij /mdblist/lists/user:', error);
+    res.status(500).json({ error: 'Server fout bij ophalen van MDBList lijsten' });
   }
 });
 
