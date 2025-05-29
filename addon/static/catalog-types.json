@@ -50,6 +50,7 @@
   },
   "mdblist": {
     "name": "MDBList",
+    "extraSupported": ["genre", "skip"],
     "icon": "mdblist-icon.png",
     "description": "Persoonlijke lijsten van MDBList",
     "catalogIdPrefix": "mdblist."
