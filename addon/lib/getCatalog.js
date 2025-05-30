@@ -13,14 +13,21 @@ async function getCatalog(type, language, page, id, genre, config) {
   if (id.startsWith("mdblist_")) {
     const parts = id.split("_"); // mdblist_<listId>_<type>
     const listId = parts[1];
+    const mediatype = parts[2]; // 'movie' of 'series'
     const apiKey = config.mdblistkey;
     if (!apiKey) throw new Error("MDBList API-key ontbreekt in config!");
 
-    const items = await fetchMDBListItems(listId, apiKey);
+    const items = await fetchMDBListItems(listId, apiKey, mediatype);
 
     // Voor elk item metadata ophalen via getMeta.js
-    const metas = await Promise.all(items.map(async (imdbId) => {
-      const meta = await getMeta({ type, id: imdbId });
+    const metas = await Promise.all(items.map(async (item) => {
+      // Pak imdb_id (voor films) of tvdb_id (voor series)
+      let metaId = null;
+      if (mediatype === "movie" && item.imdb_id) metaId = item.imdb_id;
+      if (mediatype === "series" && item.tvdb_id) metaId = item.tvdb_id;
+      if (!metaId) return null; // skip onbekende media
+
+      const meta = await getMeta({ type: mediatype, id: metaId });
       return meta;
     }));
 
@@ -41,16 +48,24 @@ async function getCatalog(type, language, page, id, genre, config) {
     .catch(console.error);
 }
 
-// Helper: MDBList API-call om lijstitems op te halen (imdb_id's)
-async function fetchMDBListItems(listId, apiKey) {
+// Helper: MDBList API-call om lijstitems op te halen (films of series)
+async function fetchMDBListItems(listId, apiKey, mediatype) {
   try {
-    const url = `https://mdblist.com/api/lists/${listId}?apikey=${apiKey}`;
+    const url = `https://api.mdblist.com/lists/${listId}/items?apikey=${apiKey}`;
     const response = await axios.get(url);
 
-    // mdblist-lijst items bevatten imdb_id's; filter alleen als ze er zijn
-    return response.data.items
-      .map(item => item.imdb_id)
-      .filter(Boolean);
+    // mdblist-lijst items bevatten arrays met "movies" en/of "shows"
+    if (mediatype === "movie" && Array.isArray(response.data.movies)) {
+      return response.data.movies;
+    }
+    if (mediatype === "series" && Array.isArray(response.data.shows)) {
+      return response.data.shows;
+    }
+    // fallback: alles samenvoegen
+    return [
+      ...(response.data.movies || []),
+      ...(response.data.shows || [])
+    ];
   } catch (err) {
     console.error("Fout bij ophalen MDBList-items:", err.message);
     return [];
