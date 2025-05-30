@@ -46,7 +46,7 @@ export function useManifestConfig() {
     ageRating,
     searchEnabled,
     catalogs: [
-      ...catalogs.filter(c => !c.id.startsWith("mdblist.")), // voorkom dubbele
+      ...catalogs.filter(c => !c.id.startsWith("mdblist_")), // voorkom dubbele
       ...mdbListCatalogs,
     ],
     mdblistSelectedLists, // optioneel: handig voor sessie
