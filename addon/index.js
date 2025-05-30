@@ -1,4 +1,5 @@
 const express = require("express");
+const cors = require('cors');
 const favicon = require('serve-favicon');
 const path = require("path")
 const addon = express();
@@ -14,6 +15,9 @@ const { parseConfig, getRpdbPoster, checkIfExists } = require("./utils/parseProp
 const { getRequestToken, getSessionId } = require("./lib/getSession");
 const { getFavorites, getWatchList } = require("./lib/getPersonalLists");
 const { blurImage } = require('./utils/imageProcessor');
+
+// CORS vóór alle routes
+addon.use(cors());
 
 // We gaan er vanuit dat globale fetch beschikbaar is (Node 18+ of polyfill)
 if (typeof fetch === "undefined") {
