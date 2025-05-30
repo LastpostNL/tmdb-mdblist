@@ -5,7 +5,6 @@ const packageJson = require("../../package.json");
 const catalogsTranslations = require("../static/translations.json");
 const CATALOG_TYPES = require("../static/catalog-types.json");
 const DEFAULT_LANGUAGE = "en-US";
-const axios = require("axios"); // 🟢 toegevoegd voor de backend-call naar MDBList
 
 function generateArrayOfYears(maxYears) {
   const max = new Date().getFullYear();
@@ -93,41 +92,6 @@ function getOptionsForCatalog(catalogDef, type, showInHome, { years, genres_movi
   }
 }
 
-// 🟢 Nieuwe functie om MDBList-catalogs op te halen
-async function getMDBListCatalogs(config, translatedCatalogs) {
-  const catalogs = [];
-  if (!config.mdblistUserToken) return catalogs;
-
-  try {
-    const response = await axios.get(`${process.env.HOST_NAME}/mdblist/lists/user`, {
-      params: { apikey: config.mdblistUserToken }
-    });
-
-    const userLists = response.data || [];
-    userLists.forEach(list => {
-      // ➜ Catalog ID en type bepalen
-      const catalogId = `mdblist.${list.id}`;
-      const type = list.type === 'show' ? 'series' : 'movie';
-
-      // ➜ Catalog entry opbouwen (zonder genres e.d.)
-      catalogs.push({
-        id: catalogId,
-        type,
-        name: `MDBList - ${list.name}`,
-        pageSize: 20,
-        extra: [
-          { name: "skip" },
-          { name: "search", isRequired: false }
-        ]
-      });
-    });
-  } catch (err) {
-    console.error("Error fetching MDBList catalogs:", err.message);
-  }
-
-  return catalogs;
-}
-
 async function getManifest(config) {
   const language = config.language || DEFAULT_LANGUAGE;
   const tmdbPrefix = config.tmdbPrefix === "true";
@@ -135,11 +99,6 @@ async function getManifest(config) {
   const sessionId = config.sessionId;
   const userCatalogs = config.catalogs || getDefaultCatalogs();
   const translatedCatalogs = loadTranslations(language);
-
-  const stremioAddonsConfig = {
-    issuer: "https://stremio-addons.net",
-    signature: "eyJhbGciOiJkaXIiLCJlbmMiOiJBMTI4Q0JDLUhTMjU2In0..DTiTHmYyIbuTMPJB35cqsw.S2C6xuCL9OoHJbtX97v-2w3IM4iFqr2Qy4xRRlvyzIY2fZAcwmm6JUMdsc2LSTigIPQeGPomaqX53ECt23cJKuH-IKs4hHLH4sLYRZNL_VC0YefQNrWjMRZ75Yz-bVx3.DJZBtIb1bOCq6Z62AMUGvw"
-  };
 
   const years = generateArrayOfYears(20);
   const genres_movie = await getGenreList(language, "movie").then(genres => genres.map(el => el.name).sort());
@@ -150,16 +109,33 @@ async function getManifest(config) {
   const options = { years, genres_movie, genres_series, filterLanguages };
 
   let catalogs = userCatalogs
+    .filter(userCatalog => userCatalog.enabled !== false)
     .filter(userCatalog => {
       const catalogDef = getCatalogDefinition(userCatalog.id);
+      // Voor MDBList catalogDef is mogelijk null, die mag dan gewoon door
+      if (userCatalog.id.startsWith("mdblist.")) return true;
       if (!catalogDef) return false;
       if (catalogDef.requiresAuth && !sessionId) return false;
       return true;
     })
     .map(userCatalog => {
+      // Speciale handling voor MDBList: direct doorsluizen
+      if (userCatalog.id.startsWith("mdblist.")) {
+        return {
+          id: userCatalog.id,
+          type: userCatalog.type,
+          name: userCatalog.name,
+          pageSize: 20,
+          extra: [
+            { name: "skip" },
+            { name: "search", isRequired: false }
+          ],
+          showInHome: userCatalog.showInHome,
+        };
+      }
+      // Standaard catalogs:
       const catalogDef = getCatalogDefinition(userCatalog.id);
       const catalogOptions = getOptionsForCatalog(catalogDef, userCatalog.type, userCatalog.showInHome, options);
-
       return createCatalog(
         userCatalog.id,
         userCatalog.type,
@@ -170,10 +146,6 @@ async function getManifest(config) {
         userCatalog.showInHome
       );
     });
-
-  // 🟢 MDBList-catalogs toevoegen
-  const mdbListCatalogs = await getMDBListCatalogs(config, translatedCatalogs);
-  catalogs = [...catalogs, ...mdbListCatalogs];
 
   // ➜ Search-catalogs toevoegen als dat aanstaat
   if (config.searchEnabled !== "false") {
@@ -213,7 +185,6 @@ async function getManifest(config) {
     resources: ["catalog", "meta"],
     types: ["movie", "series"],
     idPrefixes: provideImdbId ? ["tmdb:", "tt"] : ["tmdb:"],
-    stremioAddonsConfig,
     behaviorHints: {
       configurable: true,
       configurationRequired: false,
