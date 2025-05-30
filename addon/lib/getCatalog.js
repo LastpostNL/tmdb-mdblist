@@ -12,27 +12,32 @@ async function getCatalog(type, language, page, id, genre, config) {
   if (id.startsWith("mdblist_")) {
     const parts = id.split("_");
     const listId = parts[1];
-    const mediatype = parts[2];
     const apiKey = config.mdblistkey;
     if (!apiKey) throw new Error("MDBList API-key ontbreekt in config!");
 
-    const items = await fetchMDBListItems(listId, apiKey, mediatype);
+    const items = await fetchMDBListItems(listId, apiKey);
 
-    // DIRECTE mapping, zonder extra TMDb lookups!
-    const metas = items.map(item => ({
-      id: item.id ? `tmdb:${item.id}` : item.imdb_id ? `tt${item.imdb_id}` : undefined,
-      name: item.title || item.name,
-      type: mediatype,
-      poster: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : undefined,
-      background: item.backdrop_path ? `https://image.tmdb.org/t/p/original${item.backdrop_path}` : undefined,
-      imdb_id: item.imdb_id,
-      year: item.year || (item.release_date ? item.release_date.split("-")[0] : undefined),
-      description: item.overview,
-      // eventueel meer, maar hou het klein!
-    })).filter(meta => meta.id && meta.name && meta.poster);
+    const metas = items
+      .filter(item => {
+        // Filter op type: "movie" of "series"
+        if (type === "movie") return item.mediatype === "movie";
+        if (type === "series") return item.mediatype === "show";
+        return false;
+      })
+      .map(item => ({
+        id: item.id ? `tmdb:${item.id}` : (item.imdb_id ? `tt${item.imdb_id}` : undefined),
+        name: item.title,
+        type: type, // "movie" of "series" zoals Stremio verwacht
+        poster: item.poster,
+        genre: item.genre,
+        year: item.release_year,
+        imdb_id: item.imdb_id,
+      }))
+      .filter(meta => meta.id && meta.name && meta.poster);
 
     return { metas };
   }
+
 
 
   // Normale TMDb-catalogus
