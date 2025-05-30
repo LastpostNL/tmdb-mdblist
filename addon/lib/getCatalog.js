@@ -9,35 +9,31 @@ const CATALOG_TYPES = require("../static/catalog-types.json");
 const axios = require("axios"); // Voor MDBList API-calls
 
 async function getCatalog(type, language, page, id, genre, config) {
-  // MDBList-catalogus
   if (id.startsWith("mdblist_")) {
-    const parts = id.split("_"); // mdblist_<listId>_<type>
+    const parts = id.split("_");
     const listId = parts[1];
-    const mediatype = parts[2]; // 'movie' of 'series'
+    const mediatype = parts[2];
     const apiKey = config.mdblistkey;
     if (!apiKey) throw new Error("MDBList API-key ontbreekt in config!");
 
     const items = await fetchMDBListItems(listId, apiKey, mediatype);
 
-    const metas = await Promise.all(items.map(async (item) => {
-      // *** HIER: direct het tmdbId uit item.id pakken! ***
-      const tmdbId = item.id;
-      if (!tmdbId) {
-        console.warn("Geen TMDb-ID gevonden voor item:", item);
-        return null;
-      }
-      try {
-        const meta = await getMeta(mediatype, language, tmdbId, config.rpdbkey, config);
-        return meta;
-      } catch (e) {
-        console.error("Error in getMeta voor", tmdbId, ":", e.message || e);
-        return null;
-      }
-    }));
+    // DIRECTE mapping, zonder extra TMDb lookups!
+    const metas = items.map(item => ({
+      id: item.id ? `tmdb:${item.id}` : item.imdb_id ? `tt${item.imdb_id}` : undefined,
+      name: item.title || item.name,
+      type: mediatype,
+      poster: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : undefined,
+      background: item.backdrop_path ? `https://image.tmdb.org/t/p/original${item.backdrop_path}` : undefined,
+      imdb_id: item.imdb_id,
+      year: item.year || (item.release_date ? item.release_date.split("-")[0] : undefined),
+      description: item.overview,
+      // eventueel meer, maar hou het klein!
+    })).filter(meta => meta.id && meta.name && meta.poster);
 
-return { metas: metas.filter(Boolean).map(m => m.meta ? m.meta : m) };
-
+    return { metas };
   }
+
 
   // Normale TMDb-catalogus
   const genreList = await getGenreList(language, type);
