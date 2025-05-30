@@ -35,7 +35,8 @@ async function getCatalog(type, language, page, id, genre, config) {
       }
     }));
 
-    return { metas: metas.filter(Boolean) };
+return { metas: metas.filter(Boolean).map(m => m.meta ? m.meta : m) };
+
   }
 
   // Normale TMDb-catalogus
