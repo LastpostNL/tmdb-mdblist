@@ -17,9 +17,10 @@ async function getCatalog(type, language, page, id, genre, config) {
 
     const items = await fetchMDBListItems(listId, apiKey);
 
+    // Filter en map tegelijk!
     const metas = items
       .filter(item => {
-        // Filter op type: "movie" of "series"
+        // Films: type = "movie", Series: type = "series"
         if (type === "movie") return item.mediatype === "movie";
         if (type === "series") return item.mediatype === "show";
         return false;
@@ -27,7 +28,7 @@ async function getCatalog(type, language, page, id, genre, config) {
       .map(item => ({
         id: item.id ? `tmdb:${item.id}` : (item.imdb_id ? `tt${item.imdb_id}` : undefined),
         name: item.title,
-        type: type, // "movie" of "series" zoals Stremio verwacht
+        type: type, // "movie" of "series", zoals Stremio verwacht!
         poster: item.poster,
         genre: item.genre,
         year: item.release_year,
