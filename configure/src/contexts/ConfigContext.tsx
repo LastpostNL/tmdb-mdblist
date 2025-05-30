@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { ConfigContext, type ConfigContextType, type CatalogConfig } from "./config";
 import { 
   baseCatalogs, 
   authCatalogs, 
@@ -11,6 +10,53 @@ const allCatalogs = [
   ...authCatalogs,
   ...Object.values(streamingCatalogs).flat()
 ];
+
+export interface CatalogConfig {
+  id: string;
+  type: string;
+  name: string;
+  enabled?: boolean;
+  showInHome?: boolean;
+}
+
+export interface MDBListSelected {
+  id: number;
+  showInHome: boolean;
+}
+
+export interface ConfigContextType {
+  rpdbkey: string;
+  setRpdbkey: (v: string) => void;
+  mdblistkey: string;
+  setMdblistkey: (v: string) => void;
+  includeAdult: boolean;
+  setIncludeAdult: (v: boolean) => void;
+  provideImdbId: boolean;
+  setProvideImdbId: (v: boolean) => void;
+  tmdbPrefix: boolean;
+  setTmdbPrefix: (v: boolean) => void;
+  hideEpisodeThumbnails: boolean;
+  setHideEpisodeThumbnails: (v: boolean) => void;
+  language: string;
+  setLanguage: (v: string) => void;
+  sessionId: string;
+  setSessionId: (v: string) => void;
+  streaming: string[];
+  setStreaming: (v: string[]) => void;
+  catalogs: CatalogConfig[];
+  setCatalogs: (v: CatalogConfig[]) => void;
+  ageRating?: string;
+  setAgeRating: (v: string | undefined) => void;
+  searchEnabled: boolean;
+  setSearchEnabled: (v: boolean) => void;
+  loadConfigFromUrl: () => void;
+  mdblistLists: any[];
+  setMdblistLists: (lists: any[]) => void;
+  mdblistSelectedLists: MDBListSelected[];
+  setMdblistSelectedLists: (lists: MDBListSelected[]) => void;
+}
+
+export const ConfigContext = createContext<ConfigContextType>(null as any);
 
 export function ConfigProvider({ children }: { children: React.ReactNode }) {
   const [rpdbkey, setRpdbkey] = useState("");
@@ -25,6 +71,10 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
   const [catalogs, setCatalogs] = useState<CatalogConfig[]>([]);
   const [ageRating, setAgeRating] = useState<string | undefined>(undefined);
   const [searchEnabled, setSearchEnabled] = useState<boolean>(true);
+
+  // MDBList gerelateerd
+  const [mdblistLists, setMdblistLists] = useState<any[]>([]);
+  const [mdblistSelectedLists, setMdblistSelectedLists] = useState<MDBListSelected[]>([]);
 
   const loadDefaultCatalogs = () => {
     const defaultCatalogs = baseCatalogs.map(catalog => ({
@@ -46,7 +96,7 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
       if (config.language) setLanguage(config.language);
       
       if (config.catalogs) {
-        const catalogsWithNames = config.catalogs.map(catalog => {
+        const catalogsWithNames = config.catalogs.map((catalog: CatalogConfig) => {
           const existingCatalog = allCatalogs.find(
             c => c.id === catalog.id && c.type === catalog.type
           );
@@ -70,6 +120,14 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
       }
       
       if (config.searchEnabled) setSearchEnabled(config.searchEnabled === "true");
+
+      // -- MDBList uit URL laden (optioneel) --
+      if (config.mdblistSelectedLists) {
+        setMdblistSelectedLists(config.mdblistSelectedLists);
+      }
+      if (config.mdblistLists) {
+        setMdblistLists(config.mdblistLists);
+      }
       
       window.history.replaceState({}, '', '/configure');
     } catch (error) {
@@ -87,32 +145,36 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const value = {
+  const value: ConfigContextType = {
     rpdbkey,
-    mdblistkey,
-    includeAdult,
-    provideImdbId,
-    tmdbPrefix,
-    hideEpisodeThumbnails,
-    language,
-    sessionId,
-    streaming,
-    catalogs,
-    ageRating,
-    searchEnabled,
     setRpdbkey,
+    mdblistkey,
     setMdblistkey,
+    includeAdult,
     setIncludeAdult,
+    provideImdbId,
     setProvideImdbId,
+    tmdbPrefix,
     setTmdbPrefix,
+    hideEpisodeThumbnails,
     setHideEpisodeThumbnails,
+    language,
     setLanguage,
+    sessionId,
     setSessionId,
+    streaming,
     setStreaming,
+    catalogs,
     setCatalogs,
+    ageRating,
     setAgeRating,
+    searchEnabled,
     setSearchEnabled,
-    loadConfigFromUrl
+    loadConfigFromUrl,
+    mdblistLists,
+    setMdblistLists,
+    mdblistSelectedLists,
+    setMdblistSelectedLists,
   };
 
   return (
@@ -122,4 +184,4 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-export const useConfig = () => useContext(ConfigContext); 
+export const useConfig = () => useContext(ConfigContext);
