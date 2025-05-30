@@ -55,20 +55,11 @@ async function getCatalog(type, language, page, id, genre, config) {
 }
 
 // Helper: MDBList API-call om lijstitems op te halen (films of series)
-async function fetchMDBListItems(listId, apiKey, mediatype) {
+async function fetchMDBListItems(listId, apiKey) {
   try {
     const url = `https://api.mdblist.com/lists/${listId}/items?apikey=${apiKey}`;
-    console.log("MDBList API url:", url); // Log de opgevraagde url
     const response = await axios.get(url);
-
-    // mdblist-lijst items bevatten arrays met "movies" en/of "shows"
-    if (mediatype === "movie" && Array.isArray(response.data.movies)) {
-      return response.data.movies;
-    }
-    if (mediatype === "series" && Array.isArray(response.data.shows)) {
-      return response.data.shows;
-    }
-    // fallback: alles samenvoegen
+    // Voeg movies & shows samen, laat type-logic over aan mapping!
     return [
       ...(response.data.movies || []),
       ...(response.data.shows || [])
