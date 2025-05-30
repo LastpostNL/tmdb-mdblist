@@ -4,9 +4,30 @@ const moviedb = new MovieDb(process.env.TMDB_API);
 const { getGenreList } = require("./getGenreList");
 const { getLanguages } = require("./getLanguages");
 const { parseMedia } = require("../utils/parseProps");
+const { getMeta } = require("./getMeta");
 const CATALOG_TYPES = require("../static/catalog-types.json");
+const axios = require("axios"); // Voor MDBList API-calls
 
 async function getCatalog(type, language, page, id, genre, config) {
+  // Als het een MDBList-catalogus is
+  if (id.startsWith("mdblist.")) {
+    const listId = id.split(".")[1];
+    const apiKey = config.mdblistkey;
+    if (!apiKey) throw new Error("MDBList API-key ontbreekt in config!");
+
+    const items = await fetchMDBListItems(listId, apiKey);
+
+    // Voor elk item metadata ophalen via getMeta.js
+    const metas = await Promise.all(items.map(async (imdbId) => {
+      const meta = await getMeta({ type, id: imdbId });
+      return meta;
+    }));
+
+    // Filter lege resultaten (bijvoorbeeld als een imdbId niet gevonden wordt)
+    return { metas: metas.filter(Boolean) };
+  }
+
+  // Normale TMDb-catalogus
   const genreList = await getGenreList(language, type);
   const parameters = await buildParameters(type, language, page, id, genre, genreList, config);
 
@@ -19,9 +40,25 @@ async function getCatalog(type, language, page, id, genre, config) {
     .catch(console.error);
 }
 
+// Helper: MDBList API-call om lijstitems op te halen (imdb_id's)
+async function fetchMDBListItems(listId, apiKey) {
+  try {
+    const url = `https://mdblist.com/api/lists/${listId}?apikey=${apiKey}`;
+    const response = await axios.get(url);
+
+    // mdblist-lijst items bevatten imdb_id's; filter alleen als ze er zijn
+    return response.data.items
+      .map(item => item.imdb_id)
+      .filter(Boolean);
+  } catch (err) {
+    console.error("Fout bij ophalen MDBList-items:", err.message);
+    return [];
+  }
+}
+
 async function buildParameters(type, language, page, id, genre, genreList, config) {
   const languages = await getLanguages();
-  const parameters = { language, page, 'vote_count.gte': 10 };;
+  const parameters = { language, page, 'vote_count.gte': 10 };
 
   if (config.ageRating) {
     switch (config.ageRating) {
@@ -48,9 +85,8 @@ async function buildParameters(type, language, page, id, genre, genreList, confi
 
   if (id.includes("streaming")) {
     const provider = findProvider(id.split(".")[1]);
-
     parameters.with_genres = genre ? findGenreId(genre, genreList) : undefined;
-    parameters.with_watch_providers = provider.watchProviderId
+    parameters.with_watch_providers = provider.watchProviderId;
     parameters.watch_region = provider.country;
     parameters.with_watch_monetization_types = "flatrate|free|ads";
   } else {
