@@ -120,7 +120,7 @@ async function getManifest(config) {
     })
     .map(userCatalog => {
       // Speciale handling voor MDBList: direct doorsluizen
-      if (userCatalog.id.startsWith("mdblist.")) {
+      if (userCatalog.id.startsWith("mdblist_")) {
         return {
           id: userCatalog.id,
           type: userCatalog.type,
