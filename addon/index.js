@@ -97,6 +97,10 @@ addon.get("/:catalogChoices?/manifest.json", async function (req, res) {
 addon.get("/:catalogChoices?/catalog/:type/:id/:extra?.json", async function (req, res) {
   const { catalogChoices, type, id, extra } = req.params;
   const config = parseConfig(catalogChoices)
+  // --- FIX: zet de API-key uit de query in de config als die aanwezig is ---
+  if (req.query.apikey) {
+    config.mdblistkey = req.query.apikey;
+  }
   const language = config.language || DEFAULT_LANGUAGE;
   const rpdbkey = config.rpdbkey
   const sessionId = config.sessionId
