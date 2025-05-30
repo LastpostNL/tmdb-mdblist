@@ -23,13 +23,14 @@ export function generateAddonUrl(config: AddonConfig): string {
     rpdbkey: config.rpdbkey || undefined,
     mdblistkey: config.mdblistkey || undefined,
     sessionId: config.sessionId || undefined,
-    catalogs: config.catalogs
-      ?.filter(catalog => catalog.enabled === false ? false : true)
-      .map(({ id, type, showInHome }) => ({
-        id,
-        type,
-        showInHome
-      })),
+   catalogs: config.catalogs
+  ?.filter(catalog => catalog.enabled === false ? false : true)
+  .map(({ id, type, name, showInHome }) => ({
+    id,
+    type,
+    name,        // <-- voeg deze regel toe
+    showInHome
+  })),
     includeAdult: config.includeAdult === true ? "true" : undefined,
     provideImdbId: config.provideImdbId === true ? "true" : undefined,
     tmdbPrefix: config.tmdbPrefix === true ? "true" : undefined,
