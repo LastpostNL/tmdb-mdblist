@@ -118,7 +118,7 @@ async function getManifest(config) {
       { name: "skip" },
       { name: "search", isRequired: false }
     ],
-    showInHome: true // Zet op true/false om te testen
+    showInHome: false // Zet op true/false om te testen
   };
 
   let catalogs = userCatalogs
