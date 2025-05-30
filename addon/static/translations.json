@@ -1,12 +1,12 @@
 {
   "en-US": {
-    "popular": "Popular",
-    "year": "Year",
-    "language": "Language",
+    "popular": "Populair",
+    "year": "Uit dit jaar",
+    "language": "In het Nederlands",
     "trending": "Trending",
-    "favorites": "Favorites",
-    "watchlist": "Watchlist",
-    "search": "Search",
+    "favorites": "Favorieten",
+    "watchlist": "Watchlijst",
+    "search": "Zoeken",
     "nfx": "Netflix",
     "nfk": "Netflix Kids",
     "hbm": "HBO Max",
@@ -30,12 +30,12 @@
     "blv": "BluTV",
     "cpd": "Canal+",
     "dpe": "Discovery+",
-    "added_date": "Date Added",
-    "popularity": "Popularity",
-    "release_date": "Release Date",
-    "random": "Random",
-    "desc": "Newest First",
-    "asc": "Oldest First"
+    "added_date": "Datum toegevoegd",
+    "popularity": "Populariteit",
+    "release_date": "Release Datum",
+    "random": "Willekeurig",
+    "desc": "Nieuwste eerst",
+    "asc": "Oudste eerst"
   },
   "pt-BR": {
     "popular": "Popular",
