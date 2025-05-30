@@ -10,8 +10,9 @@ const axios = require("axios"); // Voor MDBList API-calls
 
 async function getCatalog(type, language, page, id, genre, config) {
   // Als het een MDBList-catalogus is
-  if (id.startsWith("mdblist.")) {
-    const listId = id.split(".")[1];
+  if (id.startsWith("mdblist_")) {
+    const parts = id.split("_"); // mdblist_<listId>_<type>
+    const listId = parts[1];
     const apiKey = config.mdblistkey;
     if (!apiKey) throw new Error("MDBList API-key ontbreekt in config!");
 
