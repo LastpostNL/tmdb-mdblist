@@ -25,15 +25,16 @@ async function getCatalog(type, language, page, id, genre, config) {
         if (type === "series") return item.mediatype === "show";
         return false;
       })
-      .map(item => ({
-        id: item.id ? `tmdb:${item.id}` : (item.imdb_id ? `tt${item.imdb_id}` : undefined),
-        name: item.title,
-        type: type, // "movie" of "series", zoals Stremio verwacht!
-        poster: item.poster,
-        genre: item.genre,
-        year: item.release_year,
-        imdb_id: item.imdb_id,
-      }))
+.map(item => ({
+  id: item.id ? `tmdb:${item.id}` : (item.imdb_id ? `tt${item.imdb_id}` : undefined),
+  type: type,
+  title: item.title, // <-- Gebruik altijd title voor Stremio!
+  poster: item.poster || "https://via.placeholder.com/256x384?text=No+Poster",
+  genres: Array.isArray(item.genre) ? item.genre : (item.genre ? [item.genre] : []),
+  year: item.release_year,
+  imdb_id: item.imdb_id,
+  description: item.overview || item.description || "",
+}))
       .filter(meta => meta.id && meta.name && meta.poster);
 
     return { metas };
