@@ -24,7 +24,7 @@ export function useManifestConfig() {
     const list = mdblistLists.find(l => l.id === sel.id);
     if (!list) return null;
     return {
-      id: `mdblist.${list.id}`,
+      id: `mdblist_${list.id}_${list.mediatype}`
       type: list.mediatype === "movie" ? "movie" : "series",
       name: list.name,
       enabled: true,
