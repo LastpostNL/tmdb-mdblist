@@ -110,7 +110,7 @@ async function getManifest(config) {
 
   // Hardcoded test-catalogus voor MDBList
   const hardcodedMDBListCatalog = {
-    id: "mdblist_99999_movie",
+    id: "mdblist_88078_movie",
     type: "movie",
     name: "Hardcoded Testlijst MDBList",
     pageSize: 20,
@@ -118,7 +118,7 @@ async function getManifest(config) {
       { name: "skip" },
       { name: "search", isRequired: false }
     ],
-    showInHome: false // Zet op true/false om te testen
+    showInHome: true // Zet op true/false om te testen
   };
 
   let catalogs = userCatalogs
