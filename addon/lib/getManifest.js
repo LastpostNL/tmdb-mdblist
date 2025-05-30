@@ -147,25 +147,6 @@ let catalogs = userCatalogs
       );
     });
 
-// Voeg deze hardcoded 'TMDB-achtige' catalogus toe:
-const hardcodedFakeTMDBCatalog = {
-  id: "tmdb.mdblist_88078_movie", // Let op: begint met 'tmdb.'
-  type: "movie",
-  name: "Fake TMDB (eigenlijk MDBList) - Test",
-  pageSize: 20,
-  extra: [
-    { name: "skip" },
-    { name: "search", isRequired: false }
-  ],
-  showInHome: false // Of true voor de test!
-};
-
-// Zet deze bovenaan je catalogs array:
-catalogs = [
-  hardcodedFakeTMDBCatalog,
-  ...catalogs // je bestaande dynamische/hardcoded catalogi
-];
-
   // ➜ Search-catalogs toevoegen als dat aanstaat
   if (config.searchEnabled !== "false") {
     const searchCatalogMovie = {
