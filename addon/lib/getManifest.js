@@ -108,31 +108,31 @@ async function getManifest(config) {
 
   const options = { years, genres_movie, genres_series, filterLanguages };
 
-  let catalogs = userCatalogs
-    .filter(userCatalog => userCatalog.enabled !== false)
-    .filter(userCatalog => {
-      const catalogDef = getCatalogDefinition(userCatalog.id);
-      // Voor MDBList catalogDef is mogelijk null, die mag dan gewoon door
-      if (userCatalog.id.startsWith("mdblist_")) return true;
-      if (!catalogDef) return false;
-      if (catalogDef.requiresAuth && !sessionId) return false;
-      return true;
-    })
-    .map(userCatalog => {
-      // Speciale handling voor MDBList: direct doorsluizen
-      if (userCatalog.id.startsWith("mdblist_")) {
-        return {
-          id: userCatalog.id,
-          type: userCatalog.type,
-          name: userCatalog.name,
-          pageSize: 20,
-          extra: [
-            { name: "skip" },
-            { name: "search", isRequired: false }
-          ],
-          showInHome: userCatalog.showInHome,
-        };
-      }
+let catalogs = userCatalogs
+  .filter(userCatalog => userCatalog.enabled !== false)
+  .filter(userCatalog => {
+    const catalogDef = getCatalogDefinition(userCatalog.id);
+    // Voor MDBList catalogDef is mogelijk null, die mag dan gewoon door
+    if (userCatalog.id.startsWith("mdblist_")) return true;
+    if (!catalogDef) return false;
+    if (catalogDef.requiresAuth && !sessionId) return false;
+    return true;
+  })
+  .map(userCatalog => {
+    // Speciale handling voor MDBList: direct doorsluizen
+    if (userCatalog.id.startsWith("mdblist_")) {
+      return {
+        id: userCatalog.id,
+        type: userCatalog.type,
+        name: userCatalog.name,
+        pageSize: 20,
+        extra: [
+          { name: "skip" },
+          { name: "search", isRequired: false }
+        ],
+        showInHome: userCatalog.showInHome,
+      };
+    }
       // Standaard catalogs:
       const catalogDef = getCatalogDefinition(userCatalog.id);
       const catalogOptions = getOptionsForCatalog(catalogDef, userCatalog.type, userCatalog.showInHome, options);
