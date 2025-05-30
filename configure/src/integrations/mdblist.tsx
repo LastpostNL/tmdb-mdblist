@@ -41,18 +41,18 @@ export default function MDBListIntegration() {
       setMdblistkey(tokenInput)
 
       // Update catalogs zodat mdblist lijsten er ook in staan,
-      // dit is afhankelijk van jouw structuur, maar bijvoorbeeld:
+      // LET OP: nu underscore-notatie!
       setCatalogs([
-        ...catalogs.filter(c => !c.id.startsWith('mdblist.')),
+        ...catalogs.filter(c => !c.id.startsWith('mdblist_')),
         ...Object.entries(newLists.movie).map(([id, val]) => ({
-          id: `mdblist.${id}`,
+          id: `mdblist_${id}_movie`,
           type: 'movie',
           name: val.name,
           enabled: val.enabled,
           showInHome: val.home,
         })),
         ...Object.entries(newLists.series).map(([id, val]) => ({
-          id: `mdblist.${id}`,
+          id: `mdblist_${id}_series`,
           type: 'series',
           name: val.name,
           enabled: val.enabled,
