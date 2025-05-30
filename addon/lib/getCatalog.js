@@ -8,7 +8,45 @@ const { getMeta } = require("./getMeta");
 const CATALOG_TYPES = require("../static/catalog-types.json");
 const axios = require("axios"); // Voor MDBList API-calls
 
+// === MAP STREAMING PROVIDERS NAAR EIGEN MDBLIST-LIJSTEN ===
+// Vul hier per provider (zoals 'netflix') je eigen MDBList-lijst-ID in
+const streamingToMDBList = {
+  "streaming.netflix": "97596",     // Vervang door jouw echte MDBList lijst-ID!
+  "streaming.prime": "97604",
+  // meer mappings indien gewenst...
+};
+
 async function getCatalog(type, language, page, id, genre, config) {
+  // --- 1. EIGEN MAPPING: STREAMING PROVIDERS → MDBLIST LIJST ---
+  if (streamingToMDBList[id]) {
+    const listId = streamingToMDBList[id];
+    const apiKey = config.mdblistkey;
+    if (!apiKey) throw new Error("MDBList API-key ontbreekt in config!");
+
+    const items = await fetchMDBListItems(listId, apiKey);
+
+    // Filter en map tegelijk!
+    const metas = items
+      .filter(item => {
+        if (type === "movie") return item.mediatype === "movie";
+        if (type === "series") return item.mediatype === "show";
+        return false;
+      })
+      .map(item => ({
+        id: item.id ? `tmdb:${item.id}` : (item.imdb_id ? `tt${item.imdb_id}` : undefined),
+        name: item.title,
+        type: type,
+        poster: item.poster,
+        genre: item.genre,
+        year: item.release_year,
+        imdb_id: item.imdb_id,
+      }))
+      .filter(meta => meta.id && meta.name && meta.poster);
+
+    return { metas };
+  }
+
+  // --- 2. NORMALE MDBLIST LIJST ---
   if (id.startsWith("mdblist_")) {
     const parts = id.split("_");
     const listId = parts[1];
@@ -20,7 +58,6 @@ async function getCatalog(type, language, page, id, genre, config) {
     // Filter en map tegelijk!
     const metas = items
       .filter(item => {
-        // Films: type = "movie", Series: type = "series"
         if (type === "movie") return item.mediatype === "movie";
         if (type === "series") return item.mediatype === "show";
         return false;
@@ -28,7 +65,7 @@ async function getCatalog(type, language, page, id, genre, config) {
       .map(item => ({
         id: item.id ? `tmdb:${item.id}` : (item.imdb_id ? `tt${item.imdb_id}` : undefined),
         name: item.title,
-        type: type, // "movie" of "series", zoals Stremio verwacht!
+        type: type,
         poster: item.poster,
         genre: item.genre,
         year: item.release_year,
@@ -39,13 +76,13 @@ async function getCatalog(type, language, page, id, genre, config) {
     return { metas };
   }
 
-
-
-  // Normale TMDb-catalogus
+  // --- 3. NORMALE TMDB-CATALOGUS ---
   const genreList = await getGenreList(language, type);
   const parameters = await buildParameters(type, language, page, id, genre, genreList, config);
 
-  const fetchFunction = type === "movie" ? moviedb.discoverMovie.bind(moviedb) : moviedb.discoverTv.bind(moviedb);
+  const fetchFunction = type === "movie"
+    ? moviedb.discoverMovie.bind(moviedb)
+    : moviedb.discoverTv.bind(moviedb);
 
   return fetchFunction(parameters)
     .then((res) => ({
@@ -59,7 +96,6 @@ async function fetchMDBListItems(listId, apiKey) {
   try {
     const url = `https://api.mdblist.com/lists/${listId}/items?apikey=${apiKey}&append_to_response=genre,poster`;
     const response = await axios.get(url);
-    // Voeg movies & shows samen, laat type-logic over aan mapping!
     return [
       ...(response.data.movies || []),
       ...(response.data.shows || [])
