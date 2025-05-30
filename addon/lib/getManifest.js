@@ -113,7 +113,7 @@ async function getManifest(config) {
     .filter(userCatalog => {
       const catalogDef = getCatalogDefinition(userCatalog.id);
       // Voor MDBList catalogDef is mogelijk null, die mag dan gewoon door
-      if (userCatalog.id.startsWith("mdblist.")) return true;
+      if (userCatalog.id.startsWith("mdblist_")) return true;
       if (!catalogDef) return false;
       if (catalogDef.requiresAuth && !sessionId) return false;
       return true;
