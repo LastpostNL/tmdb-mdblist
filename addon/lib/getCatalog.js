@@ -11,8 +11,8 @@ const axios = require("axios"); // Voor MDBList API-calls
 // === MAP STREAMING PROVIDERS NAAR EIGEN MDBLIST-LIJSTEN ===
 // Vul hier per provider (zoals 'netflix') je eigen MDBList-lijst-ID in
 const streamingToMDBList = {
-  "streaming.netflix": "97596",     // Vervang door jouw echte MDBList lijst-ID!
-  "streaming.prime": "97604",
+  "streaming.nfx": "97596",     // Vervang door jouw echte MDBList lijst-ID!
+  "streaming.amp": "97604",
   // meer mappings indien gewenst...
 };
 
