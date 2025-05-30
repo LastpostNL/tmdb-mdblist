@@ -17,7 +17,13 @@ async function getCatalog(type, language, page, id, genre, config) {
     const apiKey = config.mdblistkey;
     if (!apiKey) throw new Error("MDBList API-key ontbreekt in config!");
 
+    // Logging for debug
+    console.log("MDBList catalog request:", { id, listId, mediatype, apiKey });
+
     const items = await fetchMDBListItems(listId, apiKey, mediatype);
+
+    // Logging the number of items found
+    console.log(`MDBList: listId=${listId}, type=${mediatype}, aantal items: ${items.length}`);
 
     // Voor elk item metadata ophalen via getMeta.js
     const metas = await Promise.all(items.map(async (item) => {
@@ -26,6 +32,9 @@ async function getCatalog(type, language, page, id, genre, config) {
       if (mediatype === "movie" && item.imdb_id) metaId = item.imdb_id;
       if (mediatype === "series" && item.tvdb_id) metaId = item.tvdb_id;
       if (!metaId) return null; // skip onbekende media
+
+      // Log elke item die wordt opgehaald
+      console.log(`[MDBList] fetch meta for: ${metaId} (${mediatype})`);
 
       const meta = await getMeta({ type: mediatype, id: metaId });
       return meta;
@@ -52,6 +61,7 @@ async function getCatalog(type, language, page, id, genre, config) {
 async function fetchMDBListItems(listId, apiKey, mediatype) {
   try {
     const url = `https://api.mdblist.com/lists/${listId}/items?apikey=${apiKey}`;
+    console.log("MDBList API url:", url); // Log de opgevraagde url
     const response = await axios.get(url);
 
     // mdblist-lijst items bevatten arrays met "movies" en/of "shows"
