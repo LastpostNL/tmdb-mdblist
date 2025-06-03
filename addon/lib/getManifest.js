@@ -6,6 +6,22 @@ const catalogsTranslations = require("../static/translations.json");
 const CATALOG_TYPES = require("../static/catalog-types.json");
 const DEFAULT_LANGUAGE = "en-US";
 
+// Importeer je fetchMDBListItems helper (zorg dat pad klopt)
+const { fetchMDBListItems } = require("./getCatalog");
+
+// Helper: unieke genres ophalen uit MDBList
+async function getGenresFromMDBList(listId, apiKey) {
+  const items = await fetchMDBListItems(listId, apiKey);
+  const genres = [
+    ...new Set(
+      items.flatMap(item =>
+        (item.genre || []).map(g => g.charAt(0).toUpperCase() + g.slice(1))
+      )
+    )
+  ].sort();
+  return genres;
+}
+
 function generateArrayOfYears(maxYears) {
   const max = new Date().getFullYear();
   const min = max - maxYears;
@@ -108,31 +124,35 @@ async function getManifest(config) {
 
   const options = { years, genres_movie, genres_series, filterLanguages };
 
-let catalogs = userCatalogs
-  .filter(userCatalog => userCatalog.enabled !== false)
-  .filter(userCatalog => {
-    const catalogDef = getCatalogDefinition(userCatalog.id);
-    // Voor MDBList catalogDef is mogelijk null, die mag dan gewoon door
-    if (userCatalog.id.startsWith("mdblist_")) return true;
-    if (!catalogDef) return false;
-    if (catalogDef.requiresAuth && !sessionId) return false;
-    return true;
-  })
-  .map(userCatalog => {
-    // Speciale handling voor MDBList: direct doorsluizen
-    if (userCatalog.id.startsWith("mdblist_")) {
-      return {
-        id: userCatalog.id,
-        type: userCatalog.type,
-        name: userCatalog.name,
-        pageSize: 20,
-        extra: [
-          { name: "skip" },
-          { name: "search", isRequired: false }
-        ],
-        showInHome: userCatalog.showInHome,
-      };
-    }
+  // Let op: hele mapping is nu async
+  let catalogs = await Promise.all(userCatalogs
+    .filter(userCatalog => userCatalog.enabled !== false)
+    .filter(userCatalog => {
+      const catalogDef = getCatalogDefinition(userCatalog.id);
+      // Voor MDBList catalogDef is mogelijk null, die mag dan gewoon door
+      if (userCatalog.id.startsWith("mdblist_")) return true;
+      if (!catalogDef) return false;
+      if (catalogDef.requiresAuth && !sessionId) return false;
+      return true;
+    })
+    .map(async userCatalog => {
+      // Speciale handling voor MDBList: direct doorsluizen + genres ophalen
+      if (userCatalog.id.startsWith("mdblist_")) {
+        const listId = userCatalog.id.split("_")[1];
+        const genres = await getGenresFromMDBList(listId, config.mdblistkey);
+        return {
+          id: userCatalog.id,
+          type: userCatalog.type,
+          name: userCatalog.name,
+          pageSize: 20,
+          extra: [
+            { name: "genre", options: genres, isRequired: false },
+            { name: "skip" },
+            { name: "search", isRequired: false }
+          ],
+          showInHome: userCatalog.showInHome,
+        };
+      }
       // Standaard catalogs:
       const catalogDef = getCatalogDefinition(userCatalog.id);
       const catalogOptions = getOptionsForCatalog(catalogDef, userCatalog.type, userCatalog.showInHome, options);
@@ -145,7 +165,8 @@ let catalogs = userCatalogs
         translatedCatalogs,
         userCatalog.showInHome
       );
-    });
+    })
+  );
 
   // ➜ Search-catalogs toevoegen als dat aanstaat
   if (config.searchEnabled !== "false") {
