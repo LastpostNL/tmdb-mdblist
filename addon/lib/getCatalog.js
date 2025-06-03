@@ -18,29 +18,24 @@ async function getCatalog(type, language, page, id, genre, config) {
     const items = await fetchMDBListItems(listId, apiKey);
 
     // Gebruik de originele (Engelse) genres van MDBList in de dropdown
-    const availableGenres = [
-      ...new Set(
-        items.flatMap(item =>
-          (item.genre || [])
-            .map(g => {
-              if (!g || typeof g !== "string") return null;
-              // Normalize: hoofdletter eerste letter, rest klein (optioneel)
-              return g.charAt(0).toUpperCase() + g.slice(1).toLowerCase();
-            })
-            .filter(Boolean)
-        )
-      )
-    ].sort();
+const availableGenres = [
+  ...new Set(
+    items.flatMap(item =>
+      (item.genre || [])
+        .map(g => (typeof g === "string" ? g.charAt(0).toUpperCase() + g.slice(1).toLowerCase() : null))
+        .filter(Boolean)
+    )
+  )
+].sort();
 
     // Filter op de originele genre-string (exact zoals in de dropdown)
     let filteredItems = items;
-    if (genre) {
-      // Let op: vergelijk case-insensitive
-      filteredItems = items.filter(item =>
-        Array.isArray(item.genre) &&
-        item.genre.some(g => g.toLowerCase() === genre.toLowerCase())
-      );
-    }
+if (genre) {
+  filteredItems = items.filter(item =>
+    Array.isArray(item.genre) &&
+    item.genre.some(g => typeof g === "string" && g.toLowerCase() === genre.toLowerCase())
+  );
+}
 
     // Filter en map tegelijk!
     const metas = filteredItems
