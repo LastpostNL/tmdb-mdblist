@@ -8,6 +8,7 @@ const DEFAULT_LANGUAGE = "en-US";
 
 // Importeer je fetchMDBListItems helper (zorg dat pad klopt)
 const { fetchMDBListItems } = require("./getCatalog");
+console.log("IMPORT TEST", { fetchMDBListItems });
 
 // Helper: unieke genres ophalen uit MDBList
 async function getGenresFromMDBList(listId, apiKey) {
