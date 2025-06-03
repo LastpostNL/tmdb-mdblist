@@ -12,15 +12,23 @@ console.log("IMPORT TEST", { fetchMDBListItems });
 
 // Helper: unieke genres ophalen uit MDBList
 async function getGenresFromMDBList(listId, apiKey) {
-  const items = await fetchMDBListItems(listId, apiKey);
-  const genres = [
-    ...new Set(
-      items.flatMap(item =>
-        (item.genre || []).map(g => g.charAt(0).toUpperCase() + g.slice(1))
+  try {
+    console.log("CALL fetchMDBListItems", { listId, apiKey });
+    const items = await fetchMDBListItems(listId, apiKey);
+    console.log("RESULT fetchMDBListItems", { items });
+    const genres = [
+      ...new Set(
+        items.flatMap(item =>
+          (item.genre || []).map(g => g.charAt(0).toUpperCase() + g.slice(1))
+        )
       )
-    )
-  ].sort();
-  return genres;
+    ].sort();
+    console.log("GENRES", genres);
+    return genres;
+  } catch(err) {
+    console.error("ERROR in getGenresFromMDBList:", err);
+    return [];
+  }
 }
 
 function generateArrayOfYears(maxYears) {
