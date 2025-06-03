@@ -6,11 +6,38 @@ const catalogsTranslations = require("../static/translations.json");
 const CATALOG_TYPES = require("../static/catalog-types.json");
 const DEFAULT_LANGUAGE = "en-US";
 
+// Hardcoded mapping van Engelse MDBList-genres naar Nederlands
+const MDBLIST_GENRE_TRANSLATIONS = {
+  "action": "Actie",
+  "adventure": "Avontuur",
+  "animation": "Animatie",
+  "biography": "Biografie",
+  "comedy": "Komedie",
+  "crime": "Misdaad",
+  "drama": "Drama",
+  "family": "Familie",
+  "fantasy": "Fantasie",
+  "history": "Historisch",
+  "holiday": "Feestdag",
+  "horror": "Horror",
+  "music": "Muziek",
+  "musical": "Musical",
+  "mystery": "Mysterie",
+  "romance": "Romantiek",
+  "sci-fi": "Sciencefiction",
+  "science-fiction": "Sciencefiction",
+  "sport": "Sport",
+  "superhero": "Superheld",
+  "thriller": "Thriller",
+  "war": "Oorlog",
+  "western": "Western"
+};
+
 // Importeer je fetchMDBListItems helper (zorg dat pad klopt)
 const { fetchMDBListItems } = require("./getCatalog");
 
-// Helper: unieke genres ophalen uit MDBList, met optionele TMDB genre mapping voor vertaling
-async function getGenresFromMDBList(listId, apiKey, tmdbGenreMap = {}) {
+// Helper: unieke genres ophalen uit MDBList, met mapping naar Nederlands (hardcoded)
+async function getGenresFromMDBList(listId, apiKey) {
   try {
     const items = await fetchMDBListItems(listId, apiKey);
     const genres = [
@@ -18,8 +45,7 @@ async function getGenresFromMDBList(listId, apiKey, tmdbGenreMap = {}) {
         items.flatMap(item =>
           (item.genre || []).map(g => {
             const lower = g.toLowerCase();
-            // Map Engels genre naar NL als mogelijk
-            return tmdbGenreMap[lower] || g.charAt(0).toUpperCase() + g.slice(1);
+            return MDBLIST_GENRE_TRANSLATIONS[lower] || (g.charAt(0).toUpperCase() + g.slice(1));
           })
         )
       )
@@ -133,10 +159,6 @@ async function getManifest(config) {
   const genres_movie = genres_movie_list.map(el => el.name).sort();
   const genres_series = genres_series_list.map(el => el.name).sort();
 
-  // Maak een mapping Engels genre -> lokale genre
-  const genres_movie_map = Object.fromEntries(genres_movie_list.map(el => [el.name.toLowerCase(), el.name]));
-  const genres_series_map = Object.fromEntries(genres_series_list.map(el => [el.name.toLowerCase(), el.name]));
-
   const languagesArray = await getLanguages();
   const filterLanguages = setOrderLanguage(language, languagesArray);
 
@@ -154,11 +176,10 @@ async function getManifest(config) {
       return true;
     })
     .map(async userCatalog => {
-      // Speciale handling voor MDBList: direct doorsluizen + genres ophalen
+      // Speciale handling voor MDBList: direct doorsluizen + genres ophalen (nu met hardcoded mapping)
       if (userCatalog.id.startsWith("mdblist_")) {
         const listId = userCatalog.id.split("_")[1];
-        const tmdbGenreMap = userCatalog.type === "movie" ? genres_movie_map : genres_series_map;
-        const genres = await getGenresFromMDBList(listId, config.mdblistkey, tmdbGenreMap);
+        const genres = await getGenresFromMDBList(listId, config.mdblistkey);
         return {
           id: userCatalog.id,
           type: userCatalog.type,
