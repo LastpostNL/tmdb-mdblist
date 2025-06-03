@@ -67,15 +67,16 @@ async function getCatalog(type, language, page, id, genre, config) {
 // Helper: MDBList API-call om lijstitems op te halen (films of series)
 async function fetchMDBListItems(listId, apiKey) {
   try {
+    console.log("FETCH MDBLIST", listId, apiKey);
     const url = `https://api.mdblist.com/lists/${listId}/items?apikey=${apiKey}&append_to_response=genre,poster`;
     const response = await axios.get(url);
-    // Voeg movies & shows samen, laat type-logic over aan mapping!
+    console.log("MDBLIST RESPONSE", response.data);
     return [
       ...(response.data.movies || []),
       ...(response.data.shows || [])
     ];
   } catch (err) {
-    console.error("Fout bij ophalen MDBList-items:", err.message);
+    console.error("Fout bij ophalen MDBList-items:", err.message, err);
     return [];
   }
 }
