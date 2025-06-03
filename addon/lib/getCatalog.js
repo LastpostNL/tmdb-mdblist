@@ -15,43 +15,41 @@ async function getCatalog(type, language, page, id, genre, config) {
     const apiKey = config.mdblistkey;
     if (!apiKey) throw new Error("MDBList API-key ontbreekt in config!");
 
-const items = await fetchMDBListItems(listId, apiKey);
+    const items = await fetchMDBListItems(listId, apiKey);
 
-const availableGenres = [
-  ...new Set(items.flatMap(item => item.genre?.map(g => g.toLowerCase()) || []))
-].sort();
+    const availableGenres = [
+      ...new Set(items.flatMap(item => item.genre?.map(g => g.toLowerCase()) || []))
+    ].sort();
 
-// Genre-filter toevoegen, als genre parameter is opgegeven
-const filteredItems = genre
-  ? items.filter(item =>
-      Array.isArray(item.genre) &&
-      item.genre.map(g => g.toLowerCase()).includes(genre.toLowerCase())
-    )
-  : items;
+    // Genre-filter toevoegen, als genre parameter is opgegeven
+    const filteredItems = genre
+      ? items.filter(item =>
+          Array.isArray(item.genre) &&
+          item.genre.map(g => g.toLowerCase()).includes(genre.toLowerCase())
+        )
+      : items;
 
-// Filter en map tegelijk!
-const metas = filteredItems
-  .filter(item => {
-    // Films: type = "movie", Series: type = "series"
-    if (type === "movie") return item.mediatype === "movie";
-    if (type === "series") return item.mediatype === "show";
-    return false;
-  })
-  .map(item => ({
-    id: item.id ? `tmdb:${item.id}` : (item.imdb_id ? `tt${item.imdb_id}` : undefined),
-    name: item.title,
-    type: type, // "movie" of "series", zoals Stremio verwacht!
-    poster: item.poster,
-    genre: item.genre,
-    year: item.release_year,
-    imdb_id: item.imdb_id,
-  }))
-  .filter(meta => meta.id && meta.name && meta.poster);
+    // Filter en map tegelijk!
+    const metas = filteredItems
+      .filter(item => {
+        // Films: type = "movie", Series: type = "series"
+        if (type === "movie") return item.mediatype === "movie";
+        if (type === "series") return item.mediatype === "show";
+        return false;
+      })
+      .map(item => ({
+        id: item.id ? `tmdb:${item.id}` : (item.imdb_id ? `tt${item.imdb_id}` : undefined),
+        name: item.title,
+        type: type, // "movie" of "series", zoals Stremio verwacht!
+        poster: item.poster,
+        genre: item.genre,
+        year: item.release_year,
+        imdb_id: item.imdb_id,
+      }))
+      .filter(meta => meta.id && meta.name && meta.poster);
 
-return { metas, availableGenres };
+    return { metas, availableGenres };
   }
-
-
 
   // Normale TMDb-catalogus
   const genreList = await getGenreList(language, type);
@@ -155,4 +153,5 @@ function findProvider(providerId) {
   return provider;
 }
 
-module.exports = { getCatalog };
+// Voeg fetchMDBListItems toe aan de exports!
+module.exports = { getCatalog, fetchMDBListItems };
