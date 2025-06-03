@@ -8,9 +8,6 @@ const { getMeta } = require("./getMeta");
 const CATALOG_TYPES = require("../static/catalog-types.json");
 const axios = require("axios"); // Voor MDBList API-calls
 
-// Importeer de reverse mapping!
-const { REVERSE_MDBLIST_GENRE_TRANSLATIONS } = require("./getManifest");
-
 async function getCatalog(type, language, page, id, genre, config) {
   if (id.startsWith("mdblist_")) {
     const parts = id.split("_");
@@ -20,30 +17,28 @@ async function getCatalog(type, language, page, id, genre, config) {
 
     const items = await fetchMDBListItems(listId, apiKey);
 
-    // Nederlandse genres tonen in dropdown
-    const { MDBLIST_GENRE_TRANSLATIONS } = require("./getManifest");
+    // Gebruik de originele (Engelse) genres van MDBList in de dropdown
     const availableGenres = [
       ...new Set(
         items.flatMap(item =>
           (item.genre || [])
             .map(g => {
               if (!g || typeof g !== "string") return null;
-              const lower = g.toLowerCase();
-              return MDBLIST_GENRE_TRANSLATIONS[lower] || (g.charAt(0).toUpperCase() + g.slice(1));
+              // Normalize: hoofdletter eerste letter, rest klein (optioneel)
+              return g.charAt(0).toUpperCase() + g.slice(1).toLowerCase();
             })
             .filter(Boolean)
         )
       )
     ].sort();
 
-    // Genre-filter toevoegen, als genre parameter is opgegeven
+    // Filter op de originele genre-string (exact zoals in de dropdown)
     let filteredItems = items;
     if (genre) {
-      // Zet NL genre om naar EN genre
-      const englishGenre = REVERSE_MDBLIST_GENRE_TRANSLATIONS[genre] || genre;
+      // Let op: vergelijk case-insensitive
       filteredItems = items.filter(item =>
         Array.isArray(item.genre) &&
-        item.genre.map(g => g.toLowerCase()).includes(englishGenre.toLowerCase())
+        item.genre.some(g => g.toLowerCase() === genre.toLowerCase())
       );
     }
 
