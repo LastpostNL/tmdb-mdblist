@@ -41,8 +41,8 @@ if (genre) {
     const metas = filteredItems
       .filter(item => {
         // Films: type = "movie", Series: type = "series"
-        if (type === "movie") return item.mediatype === "movie";
         if (type === "series") return item.mediatype === "show";
+        if (type === "movie") return item.mediatype === "movie";
         return false;
       })
       .map(item => ({
