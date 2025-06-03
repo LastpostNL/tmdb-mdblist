@@ -1,5 +1,19 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="24" height="24" rx="12" fill="#E2E8F0"/>
-  <path d="M12 6V18M6 12H18" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-</svg> 
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 20010904//EN"
+ "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">
+<svg version="1.0" xmlns="http://www.w3.org/2000/svg"
+ width="280.000000pt" height="280.000000pt" viewBox="0 0 280.000000 280.000000"
+ preserveAspectRatio="xMidYMid meet">
+
+<g transform="translate(0.000000,280.000000) scale(0.100000,-0.100000)"
+fill="#000000" stroke="none">
+<path d="M587 2346 c-64 -17 -113 -66 -132 -130 -23 -75 -22 -1558 0 -1633 20
+-68 74 -117 144 -132 72 -15 1530 -15 1602 0 70 15 124 64 144 132 22 76 22
+1558 0 1634 -20 68 -74 117 -144 132 -79 17 -1550 14 -1614 -3z m528 -552 c50
+-47 127 -119 173 -161 l82 -76 0 -129 c0 -70 -3 -128 -6 -128 -8 0 -68 55
+-206 187 -54 51 -100 93 -103 93 -3 0 -6 -147 -7 -327 l-3 -328 -107 -3 -108
+-3 0 481 0 480 98 0 97 -1 90 -85z m855 -394 l0 -480 -105 0 -105 0 -2 335 -3
+335 -45 -42 c-212 -201 -264 -248 -271 -248 -5 0 -9 58 -9 128 0 128 0 129 28
+152 55 48 297 275 305 288 6 8 39 12 107 12 l100 0 0 -480z"/>
+</g>
+</svg>
