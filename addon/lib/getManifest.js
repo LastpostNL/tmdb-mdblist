@@ -6,7 +6,7 @@ const catalogsTranslations = require("../static/translations.json");
 const CATALOG_TYPES = require("../static/catalog-types.json");
 const DEFAULT_LANGUAGE = "en-US";
 
-// Hardcoded mapping van Engelse MDBList-genres naar Nederlands
+// Uitgebreide mapping van Engelse MDBList-genres naar Nederlands
 const MDBLIST_GENRE_TRANSLATIONS = {
   "action": "Actie",
   "adventure": "Avontuur",
@@ -30,7 +30,12 @@ const MDBLIST_GENRE_TRANSLATIONS = {
   "superhero": "Superheld",
   "thriller": "Thriller",
   "war": "Oorlog",
-  "western": "Western"
+  "western": "Western",
+  "documentary": "Documentaire",
+  "short": "Korte film",
+  "tv-movie": "Tv-film",
+  "reality": "Reality-tv",
+  "reality-tv": "Reality-tv"
 };
 
 // Reverse mapping: Nederlands -> Engels (voor filtering)
@@ -42,6 +47,13 @@ const REVERSE_MDBLIST_GENRE_TRANSLATIONS = Object.fromEntries(
 const { fetchMDBListItems } = require("./getCatalog");
 
 // Helper: unieke genres ophalen uit MDBList, met mapping naar Nederlands (hardcoded)
+// Onbekende genres worden als nette "Title Case" weergegeven.
+function toTitleCase(str) {
+  return str.replace(/\w\S*/g, (txt) =>
+    txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase()
+  );
+}
+
 async function getGenresFromMDBList(listId, apiKey) {
   try {
     const items = await fetchMDBListItems(listId, apiKey);
@@ -52,7 +64,8 @@ async function getGenresFromMDBList(listId, apiKey) {
             .map(g => {
               if (!g || typeof g !== "string") return null;
               const lower = g.toLowerCase();
-              return MDBLIST_GENRE_TRANSLATIONS[lower] || (g.charAt(0).toUpperCase() + g.slice(1));
+              // Gebruik mapping, anders fallback naar Title Case
+              return MDBLIST_GENRE_TRANSLATIONS[lower] || toTitleCase(g);
             })
             .filter(Boolean)
         )
@@ -275,4 +288,9 @@ function getDefaultCatalogs() {
 }
 
 // Export ook de mappings voor gebruik in je catalog handler!
-module.exports = { getManifest, DEFAULT_LANGUAGE, MDBLIST_GENRE_TRANSLATIONS, REVERSE_MDBLIST_GENRE_TRANSLATIONS };
+module.exports = {
+  getManifest,
+  DEFAULT_LANGUAGE,
+  MDBLIST_GENRE_TRANSLATIONS,
+  REVERSE_MDBLIST_GENRE_TRANSLATIONS
+};
