@@ -127,12 +127,12 @@ async function buildParameters(type, language, page, id, genre, genreList, confi
         const year = genre ? genre : new Date().getFullYear();
         parameters[type === "movie" ? "primary_release_year" : "first_air_date_year"] = year;
         break;
-      case "tmdb.language":
-        const findGenre = genre ? findLanguageCode(genre, languages) : language.split("-")[0];
-        parameters.with_original_language = findGenre;
-        break;
-      default:
-        break;
+case "tmdb.language":
+  parameters.with_original_language = "nl";
+  if (genre) {
+    parameters.with_genres = findGenreId(genre, genreList);
+  }
+  break;
     }
   }
   return parameters;
