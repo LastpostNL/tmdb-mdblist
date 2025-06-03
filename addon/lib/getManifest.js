@@ -43,10 +43,13 @@ async function getGenresFromMDBList(listId, apiKey) {
     const genres = [
       ...new Set(
         items.flatMap(item =>
-          (item.genre || []).map(g => {
-            const lower = g.toLowerCase();
-            return MDBLIST_GENRE_TRANSLATIONS[lower] || (g.charAt(0).toUpperCase() + g.slice(1));
-          })
+          (item.genre || [])
+            .map(g => {
+              if (!g || typeof g !== "string") return null;
+              const lower = g.toLowerCase();
+              return MDBLIST_GENRE_TRANSLATIONS[lower] || (g.charAt(0).toUpperCase() + g.slice(1));
+            })
+            .filter(Boolean)
         )
       )
     ].sort();
@@ -56,6 +59,7 @@ async function getGenresFromMDBList(listId, apiKey) {
     return [];
   }
 }
+
 
 function generateArrayOfYears(maxYears) {
   const max = new Date().getFullYear();
