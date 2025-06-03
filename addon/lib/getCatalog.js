@@ -154,4 +154,5 @@ function findProvider(providerId) {
 }
 
 // Voeg fetchMDBListItems toe aan de exports!
+console.log("EXPORT TEST", { fetchMDBListItems });
 module.exports = { getCatalog, fetchMDBListItems };
