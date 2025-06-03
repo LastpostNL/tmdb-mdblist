@@ -33,6 +33,11 @@ const MDBLIST_GENRE_TRANSLATIONS = {
   "western": "Western"
 };
 
+// Reverse mapping: Nederlands -> Engels (voor filtering)
+const REVERSE_MDBLIST_GENRE_TRANSLATIONS = Object.fromEntries(
+  Object.entries(MDBLIST_GENRE_TRANSLATIONS).map(([en, nl]) => [nl, en])
+);
+
 // Importeer je fetchMDBListItems helper (zorg dat pad klopt)
 const { fetchMDBListItems } = require("./getCatalog");
 
@@ -59,7 +64,6 @@ async function getGenresFromMDBList(listId, apiKey) {
     return [];
   }
 }
-
 
 function generateArrayOfYears(maxYears) {
   const max = new Date().getFullYear();
@@ -270,4 +274,5 @@ function getDefaultCatalogs() {
   );
 }
 
-module.exports = { getManifest, DEFAULT_LANGUAGE };
+// Export ook de mappings voor gebruik in je catalog handler!
+module.exports = { getManifest, DEFAULT_LANGUAGE, MDBLIST_GENRE_TRANSLATIONS, REVERSE_MDBLIST_GENRE_TRANSLATIONS };
