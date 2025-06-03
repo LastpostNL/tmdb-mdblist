@@ -128,11 +128,12 @@ async function buildParameters(type, language, page, id, genre, genreList, confi
         parameters[type === "movie" ? "primary_release_year" : "first_air_date_year"] = year;
         break;
 case "tmdb.language":
-  parameters.with_original_language = "nl";
-  if (genre) {
-    parameters.with_genres = findGenreId(genre, genreList);
-  }
-  break;
+        parameters.with_genres = genre ? findGenreId(genre, genreList) : undefined;
+        if (type === "series") {
+          parameters.watch_region = language.split("-")[1];
+          parameters.with_watch_monetization_types = "flatrate|free|ads|rent|buy";
+        }
+        break;
     }
   }
   return parameters;
