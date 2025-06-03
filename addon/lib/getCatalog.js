@@ -8,6 +8,9 @@ const { getMeta } = require("./getMeta");
 const CATALOG_TYPES = require("../static/catalog-types.json");
 const axios = require("axios"); // Voor MDBList API-calls
 
+// Importeer de reverse mapping!
+const { REVERSE_MDBLIST_GENRE_TRANSLATIONS } = require("./getManifest");
+
 async function getCatalog(type, language, page, id, genre, config) {
   if (id.startsWith("mdblist_")) {
     const parts = id.split("_");
@@ -17,17 +20,32 @@ async function getCatalog(type, language, page, id, genre, config) {
 
     const items = await fetchMDBListItems(listId, apiKey);
 
+    // Nederlandse genres tonen in dropdown
+    const { MDBLIST_GENRE_TRANSLATIONS } = require("./getManifest");
     const availableGenres = [
-      ...new Set(items.flatMap(item => item.genre?.map(g => g.toLowerCase()) || []))
+      ...new Set(
+        items.flatMap(item =>
+          (item.genre || [])
+            .map(g => {
+              if (!g || typeof g !== "string") return null;
+              const lower = g.toLowerCase();
+              return MDBLIST_GENRE_TRANSLATIONS[lower] || (g.charAt(0).toUpperCase() + g.slice(1));
+            })
+            .filter(Boolean)
+        )
+      )
     ].sort();
 
     // Genre-filter toevoegen, als genre parameter is opgegeven
-    const filteredItems = genre
-      ? items.filter(item =>
-          Array.isArray(item.genre) &&
-          item.genre.map(g => g.toLowerCase()).includes(genre.toLowerCase())
-        )
-      : items;
+    let filteredItems = items;
+    if (genre) {
+      // Zet NL genre om naar EN genre
+      const englishGenre = REVERSE_MDBLIST_GENRE_TRANSLATIONS[genre] || genre;
+      filteredItems = items.filter(item =>
+        Array.isArray(item.genre) &&
+        item.genre.map(g => g.toLowerCase()).includes(englishGenre.toLowerCase())
+      );
+    }
 
     // Filter en map tegelijk!
     const metas = filteredItems
@@ -127,16 +145,16 @@ async function buildParameters(type, language, page, id, genre, genreList, confi
         const year = genre ? genre : new Date().getFullYear();
         parameters[type === "movie" ? "primary_release_year" : "first_air_date_year"] = year;
         break;
-case "tmdb.language":
-  parameters.with_original_language = "nl"; // <-- Altijd alleen Nederlands
-  if (genre) {
-    parameters.with_genres = findGenreId(genre, genreList);
-  }
-  if (type === "series") {
-    parameters.watch_region = language.split("-")[1];
-    parameters.with_watch_monetization_types = "flatrate|free|ads|rent|buy";
-  }
-  break;
+      case "tmdb.language":
+        parameters.with_original_language = "nl"; // <-- Altijd alleen Nederlands
+        if (genre) {
+          parameters.with_genres = findGenreId(genre, genreList);
+        }
+        if (type === "series") {
+          parameters.watch_region = language.split("-")[1];
+          parameters.with_watch_monetization_types = "flatrate|free|ads|rent|buy";
+        }
+        break;
     }
   }
   return parameters;
@@ -158,6 +176,4 @@ function findProvider(providerId) {
   return provider;
 }
 
-// Voeg fetchMDBListItems toe aan de exports!
-console.log("EXPORT TEST", { fetchMDBListItems });
 module.exports = { getCatalog, fetchMDBListItems };
