@@ -157,9 +157,7 @@ async function getManifest(config) {
           pageSize: 20,
           extra: [
             { name: "genre", options: genres, isRequired: false },
-            { name: "skip" },
-            { name: "search", isRequired: false }
-          ],
+            { name: "skip" }          ],
           showInHome: userCatalog.showInHome,
         };
       }
