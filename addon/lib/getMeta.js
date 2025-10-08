@@ -42,6 +42,31 @@ const buildLinks = (imdbRating, imdbId, title, type, genres, credits, language) 
   ...Utils.parseCreditsLink(credits)
 ];
 
+// If videos are empty for the requested language, try a fallback to en-US and use those videos.
+// This improves trailer availability when TMDB only has trailers in en-US.
+async function ensureVideosForLanguage(res, tmdbId, isMovie = true) {
+  try {
+    const hasVideos = res && res.videos && Array.isArray(res.videos.results) && res.videos.results.length > 0;
+    if (hasVideos) return;
+
+    // Fetch videos explicitly in en-US as a fallback
+    if (isMovie && typeof moviedb.movieVideos === "function") {
+      const videosRes = await moviedb.movieVideos({ id: tmdbId, language: "en-US" });
+      if (videosRes && Array.isArray(videosRes.results) && videosRes.results.length > 0) {
+        res.videos = videosRes;
+      }
+    } else if (!isMovie && typeof moviedb.tvVideos === "function") {
+      const videosRes = await moviedb.tvVideos({ id: tmdbId, language: "en-US" });
+      if (videosRes && Array.isArray(videosRes.results) && videosRes.results.length > 0) {
+        res.videos = videosRes;
+      }
+    }
+  } catch (e) {
+    // Do not fail the meta call just because fallback failed; log for debugging.
+    console.warn(`Fallback video fetch failed for ${tmdbId}:`, e.message);
+  }
+}
+
 // Movie specific functions
 const fetchMovieData = async (tmdbId, language) => {
   return await moviedb.movieInfo({
@@ -62,6 +87,9 @@ const buildMovieResponse = async (res, type, language, tmdbId, rpdbkey) => {
   ]);
 
   const imdbRating = imdbRatingRaw || res.vote_average?.toFixed(1) || "N/A";
+
+  // Ensure videos exist (fallback to en-US if needed) before parsing trailers
+  await ensureVideosForLanguage(res, tmdbId, true);
 
   return {
     imdb_id: res.imdb_id,
@@ -124,6 +152,9 @@ const buildTvResponse = async (res, type, language, tmdbId, rpdbkey, config) => 
   ]);
 
   const imdbRating = imdbRatingRaw || res.vote_average?.toFixed(1) || "N/A";
+
+  // Ensure videos exist (fallback to en-US if needed) before parsing trailers
+  await ensureVideosForLanguage(res, tmdbId, false);
 
   return {
     country: Utils.parseCoutry(res.production_countries),
