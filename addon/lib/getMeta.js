@@ -91,6 +91,17 @@ const buildMovieResponse = async (res, type, language, tmdbId, rpdbkey) => {
   // Ensure videos exist (fallback to en-US if needed) before parsing trailers
   await ensureVideosForLanguage(res, tmdbId, true);
 
+  // Parse trailers and trailer links
+  const parsedTrailers = Utils.parseTrailers(res.videos);
+  const parsedTrailerStreams = Utils.parseTrailerStream(res.videos);
+  const trailerLinks = Utils.parseTrailerLinks(res.videos);
+
+  // Build meta.links: existing links + trailer links (external YouTube URLs)
+  const links = [
+    ...buildLinks(imdbRating, res.imdb_id, res.title, type, res.genres, res.credits, language),
+    ...trailerLinks
+  ];
+
   return {
     imdb_id: res.imdb_id,
     country: Utils.parseCoutry(res.production_countries),
@@ -104,15 +115,18 @@ const buildMovieResponse = async (res, type, language, tmdbId, rpdbkey) => {
     type,
     writer: Utils.parseWriter(res.credits),
     year: res.release_date ? res.release_date.substr(0, 4) : "",
-    trailers: Utils.parseTrailers(res.videos),
+    // Keep original trailers for compatibility, but do NOT provide proxied playable URLs
+    // so clients will be less likely to try in-app playback.
+    trailers: parsedTrailers,
+    // Keep trailerStreams empty to avoid forcing in-app playback; clients will use trailer links
+    trailerStreams: [], 
     background: `https://image.tmdb.org/t/p/original${res.backdrop_path}`,
     poster,
     runtime: Utils.parseRunTime(res.runtime),
     id: `tmdb:${tmdbId}`,
     genres: Utils.parseGenres(res.genres),
     releaseInfo: res.release_date ? res.release_date.substr(0, 4) : "",
-    trailerStreams: Utils.parseTrailerStream(res.videos),
-    links: buildLinks(imdbRating, res.imdb_id, res.title, type, res.genres, res.credits, language),
+    links,
     behaviorHints: {
       defaultVideoId: res.imdb_id ? res.imdb_id : `tmdb:${res.id}`,
       hasScheduledVideos: false
@@ -156,6 +170,15 @@ const buildTvResponse = async (res, type, language, tmdbId, rpdbkey, config) => 
   // Ensure videos exist (fallback to en-US if needed) before parsing trailers
   await ensureVideosForLanguage(res, tmdbId, false);
 
+  const parsedTrailers = Utils.parseTrailers(res.videos);
+  const parsedTrailerStreams = Utils.parseTrailerStream(res.videos);
+  const trailerLinks = Utils.parseTrailerLinks(res.videos);
+
+  const links = [
+    ...buildLinks(imdbRating, res.external_ids.imdb_id, res.name, type, res.genres, res.credits, language),
+    ...trailerLinks
+  ];
+
   return {
     country: Utils.parseCoutry(res.production_countries),
     description: res.overview,
@@ -176,9 +199,10 @@ const buildTvResponse = async (res, type, language, tmdbId, rpdbkey, config) => 
     genres: Utils.parseGenres(res.genres),
     releaseInfo: Utils.parseYear(res.status, res.first_air_date, res.last_air_date),
     videos: episodes || [],
-    links: buildLinks(imdbRating, res.external_ids.imdb_id, res.name, type, res.genres, res.credits, language),
-    trailers: Utils.parseTrailers(res.videos),
-    trailerStreams: Utils.parseTrailerStream(res.videos),
+    links,
+    // Provide trailers metadata but avoid trailerStreams playable entries to encourage external open
+    trailers: parsedTrailers,
+    trailerStreams: [],
     behaviorHints: {
       defaultVideoId: null,
       hasScheduledVideos: true
