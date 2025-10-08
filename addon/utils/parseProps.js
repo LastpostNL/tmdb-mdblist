@@ -37,26 +37,66 @@ function parseSlug(type, title, imdb_id) {
     }`;
 }
 
+// Improved trailer parsing so Stremio reliably detects trailers.
+// Keeps compatibility with existing usage but returns richer fields:
+// - id (youtube:KEY), url (full YouTube URL), name, type, site, source (youtube key)
 function parseTrailers(videos) {
-  return videos.results
-    .filter((el) => el.site === "YouTube")
-    .filter((el) => el.type === "Trailer")
+  if (!videos || !Array.isArray(videos.results)) return [];
+
+  // Prefer official trailers, but accept other trailer-like items.
+  const preferredTypes = ["Trailer", "Teaser", "Clip"];
+
+  const results = videos.results
+    .filter((el) => el.site && typeof el.site === "string" && el.site.toLowerCase() === "youtube")
+    .filter((el) => el.key) // must have youtube key
+    // keep those with typical types but don't strictly exclude others
+    .filter((el) => !el.type || preferredTypes.includes(el.type))
     .map((el) => {
       return {
-        source: `${el.key}`,
-        type: `${el.type}`,
+        id: `youtube:${el.key}`,
+        name: el.name || "Trailer",
+        type: el.type || "Trailer",
+        site: el.site || "YouTube",
+        source: el.key, // legacy compatibility
+        url: `https://www.youtube.com/watch?v=${el.key}`,
+        // Include 'official' flag if present so clients can prioritize
+        official: el.official === true
       };
     });
+
+  // If none matched the preferredTypes filter (rare), fall back to any YouTube item
+  if (results.length === 0 && videos.results.length > 0) {
+    return videos.results
+      .filter((el) => el.site && typeof el.site === "string" && el.site.toLowerCase() === "youtube")
+      .filter((el) => el.key)
+      .map((el) => ({
+        id: `youtube:${el.key}`,
+        name: el.name || "Trailer",
+        type: el.type || "Trailer",
+        site: el.site || "YouTube",
+        source: el.key,
+        url: `https://www.youtube.com/watch?v=${el.key}`,
+        official: el.official === true
+      }));
+  }
+
+  return results;
 }
 
+// Keep trailerStreams compatible with existing consumers but add url and id.
 function parseTrailerStream(videos) {
+  if (!videos || !Array.isArray(videos.results)) return [];
+
   return videos.results
-    .filter((el) => el.site === "YouTube")
-    .filter((el) => el.type === "Trailer")
+    .filter((el) => el.site && typeof el.site === "string" && el.site.toLowerCase() === "youtube")
+    .filter((el) => el.key)
     .map((el) => {
       return {
-        title: `${el.name}`,
-        ytId: `${el.key}`,
+        id: `youtube:${el.key}`,
+        title: el.name || "Trailer",
+        ytId: el.key,
+        url: `https://www.youtube.com/watch?v=${el.key}`,
+        source: "YouTube",
       };
     });
 }
@@ -195,6 +235,7 @@ function parseMedia(el, type, genreList = []) {
     description: el.overview,
   };
 }
+
 function getRpdbPoster(type, id, language, rpdbkey) {
   const tier = rpdbkey.split("-")[0]
   const lang = language.split("-")[0]
@@ -203,6 +244,37 @@ function getRpdbPoster(type, id, language, rpdbkey) {
   } else {
     return `https://api.ratingposterdb.com/${rpdbkey}/tmdb/poster-default/${type}-${id}.jpg?fallback=true&lang=${lang}`
   }
+}
+
+function parseMDBListItemsToStremioItems(data) {
+  const results = [];
+
+  if (data.movies) {
+    for (const m of data.movies) {
+      results.push({
+        id: String(m.id),
+        type: 'movie',
+        name: m.title,
+        year: m.release_year,
+        imdb_id: m.imdb_id || undefined,
+        // poster kan je eventueel later toevoegen via extra API call
+      });
+    }
+  }
+
+  if (data.shows) {
+    for (const s of data.shows) {
+      results.push({
+        id: String(s.id),
+        type: 'series',
+        name: s.title,
+        year: s.release_year,
+        imdb_id: s.imdb_id || undefined,
+      });
+    }
+  }
+
+  return results;
 }
 
 async function checkIfExists(rpdbImage) {
@@ -238,5 +310,6 @@ module.exports = {
   parsePoster,
   parseMedia,
   getRpdbPoster,
+  parseMDBListItemsToStremioItems,
   checkIfExists
 };
