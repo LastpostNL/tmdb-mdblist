@@ -101,6 +101,35 @@ function parseTrailerStream(videos) {
     });
 }
 
+// NEW: produce Link objects for meta.links so clients can open the trailer externally
+// Returns array of { name, category: "Trailer", url }
+function parseTrailerLinks(videos) {
+  if (!videos || !Array.isArray(videos.results)) return [];
+
+  // Map unique youtube keys to link objects (dedupe by key)
+  const seen = new Set();
+  const links = [];
+
+  for (const el of videos.results) {
+    if (!el || !el.key || !el.site) continue;
+    if (String(el.site).toLowerCase() !== "youtube") continue;
+
+    const key = el.key;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const name = el.name || "Trailer";
+    const url = `https://www.youtube.com/watch?v=${key}`;
+    links.push({
+      name,
+      category: "Trailer",
+      url,
+    });
+  }
+
+  return links;
+}
+
 function parseImdbLink(vote_average, imdb_id) {
   return {
     name: vote_average,
@@ -297,6 +326,7 @@ module.exports = {
   parseWriter,
   parseTrailers,
   parseTrailerStream,
+  parseTrailerLinks,
   parseImdbLink,
   parseShareLink,
   parseGenreLink,
