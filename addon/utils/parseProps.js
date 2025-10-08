@@ -37,65 +37,146 @@ function parseSlug(type, title, imdb_id) {
     }`;
 }
 
-// Improved trailer parsing so Stremio reliably detects trailers.
-// parseTrailers returns richer metadata (id/source/name/site/type)
-// parseTrailerStream returns minimal playable info Stremio expects (title, ytId)
+/*
+  Trailer selection & prioritization logic to reduce "noise" (reviews/shorts/clips/etc.)
+  - Exclude items whose title contains blacklisted keywords (review, reaction, short, clip, scene, fan, etc.)
+  - Score items and sort by score: official + type 'Trailer' + size + title contains 'trailer'
+  - Deduplicate by YouTube key
+*/
+
+// Keywords that indicate non-trailer content
+const EXCLUDE_KEYWORDS = [
+  "review",
+  "reaction",
+  "analysis",
+  "breakdown",
+  "essay",
+  "discussion",
+  "shorts",
+  "short",
+  "scene",
+  "clip",
+  "fan",
+  "spoiler",
+  "interview",
+  "featurette"
+];
+
+function titleHasExcludedKeyword(title = "") {
+  const t = String(title).toLowerCase();
+  return EXCLUDE_KEYWORDS.some(k => t.includes(k));
+}
+
+function scoreVideoItem(el) {
+  let score = 0;
+
+  if (!el) return score;
+
+  // official flag is strong indicator
+  if (el.official === true) score += 100;
+
+  // type preference
+  if (el.type === "Trailer") score += 50;
+  else if (el.type === "Teaser") score += 20;
+  else if (el.type === "Featurette") score += 10;
+
+  // title contains 'trailer' is a positive sign
+  if (el.name && /trailer/i.test(el.name)) score += 10;
+
+  // prefer larger sizes (numerical)
+  if (el.size && Number(el.size)) {
+    score += Math.min(Number(el.size), 2160) / 10; // normalized contribution
+  }
+
+  // language preference: prefer en or unspecified (slight)
+  if (el.iso_639_1 && String(el.iso_639_1).toLowerCase() === "en") score += 5;
+
+  // penalize if title likely indicates non-trailer
+  if (titleHasExcludedKeyword(el.name)) score -= 200;
+
+  return score;
+}
+
+// Return parsed trailers prioritized and filtered
 function parseTrailers(videos) {
   if (!videos || !Array.isArray(videos.results)) return [];
 
-  // Prefer official trailers, but accept other trailer-like items.
-  const preferredTypes = ["Trailer", "Teaser", "Clip"];
-
-  const results = videos.results
+  // map to items with score
+  const items = videos.results
     .filter((el) => el && el.site && typeof el.site === "string" && el.site.toLowerCase() === "youtube")
-    .filter((el) => el.key) // must have youtube key
-    // keep those with typical types but don't strictly exclude others
-    .filter((el) => !el.type || preferredTypes.includes(el.type))
-    .map((el) => {
+    .filter((el) => el && el.key)
+    .map(el => {
       return {
-        id: `youtube:${el.key}`,
-        name: el.name || "Trailer",
-        type: el.type || "Trailer",
-        site: el.site || "YouTube",
-        source: el.key, // youtube key (legacy compat)
-        // do not provide direct youtube watch URL here to avoid forcing in-client fetch
-        official: el.official === true
+        raw: el,
+        key: el.key,
+        score: scoreVideoItem(el)
       };
-    });
+    })
+    // remove items with very low score (likely non-trailer)
+    .filter(item => item.score > -100)
+    // dedupe by key - keep best scored one
+    .reduce((acc, item) => {
+      if (!acc.map[item.key] || acc.map[item.key].score < item.score) {
+        acc.map[item.key] = item;
+      }
+      return acc;
+    }, { map: {} });
 
-  // If none matched the preferredTypes filter (rare), fall back to any YouTube item
-  if (results.length === 0 && videos.results.length > 0) {
-    return videos.results
-      .filter((el) => el && el.site && typeof el.site === "string" && el.site.toLowerCase() === "youtube")
-      .filter((el) => el.key)
-      .map((el) => ({
-        id: `youtube:${el.key}`,
-        name: el.name || "Trailer",
-        type: el.type || "Trailer",
-        site: el.site || "YouTube",
-        source: el.key,
-        official: el.official === true
-      }));
-  }
+  // convert back to array
+  const deduped = Object.values(items.map);
 
-  return results;
+  // sort by descending score
+  deduped.sort((a, b) => b.score - a.score);
+
+  // map to the expected trailer metadata structure, keep richer fields
+  return deduped.map(entry => {
+    const el = entry.raw;
+    return {
+      id: `youtube:${el.key}`,
+      name: el.name || "Trailer",
+      type: el.type || "Trailer",
+      site: el.site || "YouTube",
+      source: el.key,
+      official: el.official === true,
+      size: el.size || null,
+      // keep iso fields so callers can make language decisions if desired
+      iso_639_1: el.iso_639_1 || null,
+      iso_3166_1: el.iso_3166_1 || null
+    };
+  });
 }
 
-// IMPORTANT: return only the minimal structure Stremio expects for YT playback.
-// Do NOT include full youtube.com watch URLs (those can cause CORS when clients probe them).
-// Stremio clients that support YouTube will use ytId.
+// For playable streams, return minimal structure Stremio expects: title + ytId
 function parseTrailerStream(videos) {
   if (!videos || !Array.isArray(videos.results)) return [];
 
-  return videos.results
+  const items = videos.results
     .filter((el) => el && el.site && typeof el.site === "string" && el.site.toLowerCase() === "youtube")
-    .filter((el) => el.key)
-    .map((el) => {
-      return {
-        title: el.name || "Trailer",
-        ytId: el.key
-      };
-    });
+    .filter((el) => el && el.key)
+    .map(el => ({
+      raw: el,
+      key: el.key,
+      score: scoreVideoItem(el)
+    }))
+    .filter(item => item.score > -100)
+    .reduce((acc, item) => {
+      if (!acc.map[item.key] || acc.map[item.key].score < item.score) {
+        acc.map[item.key] = item;
+      }
+      return acc;
+    }, { map: {} });
+
+  const deduped = Object.values(items.map);
+
+  deduped.sort((a, b) => b.score - a.score);
+
+  return deduped.map(entry => {
+    const el = entry.raw;
+    return {
+      title: el.name || "Trailer",
+      ytId: el.key
+    };
+  });
 }
 
 // optional: still produce external links (kept for compatibility / fallback)
