@@ -38,8 +38,8 @@ function parseSlug(type, title, imdb_id) {
 }
 
 // Improved trailer parsing so Stremio reliably detects trailers.
-// Keeps compatibility with existing usage but returns richer fields:
-// - id (youtube:KEY), url (full YouTube URL), name, type, site, source (youtube key)
+// parseTrailers returns richer metadata (id/source/name/site/type)
+// parseTrailerStream returns minimal playable info Stremio expects (title, ytId)
 function parseTrailers(videos) {
   if (!videos || !Array.isArray(videos.results)) return [];
 
@@ -47,7 +47,7 @@ function parseTrailers(videos) {
   const preferredTypes = ["Trailer", "Teaser", "Clip"];
 
   const results = videos.results
-    .filter((el) => el.site && typeof el.site === "string" && el.site.toLowerCase() === "youtube")
+    .filter((el) => el && el.site && typeof el.site === "string" && el.site.toLowerCase() === "youtube")
     .filter((el) => el.key) // must have youtube key
     // keep those with typical types but don't strictly exclude others
     .filter((el) => !el.type || preferredTypes.includes(el.type))
@@ -57,9 +57,8 @@ function parseTrailers(videos) {
         name: el.name || "Trailer",
         type: el.type || "Trailer",
         site: el.site || "YouTube",
-        source: el.key, // legacy compatibility
-        url: `https://www.youtube.com/watch?v=${el.key}`,
-        // Include 'official' flag if present so clients can prioritize
+        source: el.key, // youtube key (legacy compat)
+        // do not provide direct youtube watch URL here to avoid forcing in-client fetch
         official: el.official === true
       };
     });
@@ -67,7 +66,7 @@ function parseTrailers(videos) {
   // If none matched the preferredTypes filter (rare), fall back to any YouTube item
   if (results.length === 0 && videos.results.length > 0) {
     return videos.results
-      .filter((el) => el.site && typeof el.site === "string" && el.site.toLowerCase() === "youtube")
+      .filter((el) => el && el.site && typeof el.site === "string" && el.site.toLowerCase() === "youtube")
       .filter((el) => el.key)
       .map((el) => ({
         id: `youtube:${el.key}`,
@@ -75,7 +74,6 @@ function parseTrailers(videos) {
         type: el.type || "Trailer",
         site: el.site || "YouTube",
         source: el.key,
-        url: `https://www.youtube.com/watch?v=${el.key}`,
         official: el.official === true
       }));
   }
@@ -83,30 +81,27 @@ function parseTrailers(videos) {
   return results;
 }
 
-// Keep trailerStreams compatible with existing consumers but add url and id.
+// IMPORTANT: return only the minimal structure Stremio expects for YT playback.
+// Do NOT include full youtube.com watch URLs (those can cause CORS when clients probe them).
+// Stremio clients that support YouTube will use ytId.
 function parseTrailerStream(videos) {
   if (!videos || !Array.isArray(videos.results)) return [];
 
   return videos.results
-    .filter((el) => el.site && typeof el.site === "string" && el.site.toLowerCase() === "youtube")
+    .filter((el) => el && el.site && typeof el.site === "string" && el.site.toLowerCase() === "youtube")
     .filter((el) => el.key)
     .map((el) => {
       return {
-        id: `youtube:${el.key}`,
         title: el.name || "Trailer",
-        ytId: el.key,
-        url: `https://www.youtube.com/watch?v=${el.key}`,
-        source: "YouTube",
+        ytId: el.key
       };
     });
 }
 
-// NEW: produce Link objects for meta.links so clients can open the trailer externally
-// Returns array of { name, category: "Trailer", url }
+// optional: still produce external links (kept for compatibility / fallback)
 function parseTrailerLinks(videos) {
   if (!videos || !Array.isArray(videos.results)) return [];
 
-  // Map unique youtube keys to link objects (dedupe by key)
   const seen = new Set();
   const links = [];
 
@@ -119,11 +114,10 @@ function parseTrailerLinks(videos) {
     seen.add(key);
 
     const name = el.name || "Trailer";
-    const url = `https://www.youtube.com/watch?v=${key}`;
     links.push({
       name,
       category: "Trailer",
-      url,
+      url: `https://www.youtube.com/watch?v=${key}`,
     });
   }
 
