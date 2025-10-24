@@ -92,14 +92,8 @@ const buildMovieResponse = async (res, type, language, tmdbId, rpdbkey) => {
   await ensureVideosForLanguage(res, tmdbId, true);
 
   // Parse trailers and trailerStreams (no direct youtube.com URLs in trailerStreams)
-  const parsedTrailers = (res.videos?.results || [])
-    .filter((v) => v.site === "YouTube" && v.key)
-    .map((v) => ({
-      name: v.name || "Trailer",
-      externalUrl: `https://www.youtube.com/watch?v=${v.key}`,
-    }));
-
-  const parsedTrailerStreams = []; // Android TV: open in external YouTube app
+  const parsedTrailers = Utils.parseTrailers(res.videos);
+  const parsedTrailerStreams = Utils.parseTrailerStream(res.videos);
 
   return {
     imdb_id: res.imdb_id,
@@ -167,14 +161,8 @@ const buildTvResponse = async (res, type, language, tmdbId, rpdbkey, config) => 
   // Ensure videos exist (fallback to en-US if needed) before parsing trailers
   await ensureVideosForLanguage(res, tmdbId, false);
 
-  const parsedTrailers = (res.videos?.results || [])
-    .filter((v) => v.site === "YouTube" && v.key)
-    .map((v) => ({
-      name: v.name || "Trailer",
-      externalUrl: `https://www.youtube.com/watch?v=${v.key}`,
-    }));
-
-  const parsedTrailerStreams = []; // Android TV: open in external YouTube app
+  const parsedTrailers = Utils.parseTrailers(res.videos);
+  const parsedTrailerStreams = Utils.parseTrailerStream(res.videos);
 
   return {
     country: Utils.parseCoutry(res.production_countries),
