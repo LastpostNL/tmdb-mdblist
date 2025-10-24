@@ -68,7 +68,6 @@ async function ensureVideosForLanguage(res, tmdbId, isMovie = true) {
 }
 
 /* -------------------- MOVIE -------------------- */
-
 const fetchMovieData = async (tmdbId, language) => {
   return await moviedb.movieInfo({
     id: tmdbId,
@@ -92,12 +91,12 @@ const buildMovieResponse = async (res, type, language, tmdbId, rpdbkey) => {
   await ensureVideosForLanguage(res, tmdbId, true);
 
   const parsedTrailers = Utils.parseTrailers(res.videos);
-  const parsedTrailerStreams = parsedTrailers.length > 0 ? [{
-    title: parsedTrailers[0].name || "Trailer",
-    ytId: parsedTrailers[0].source,
-    url: null,
-    externalUrl: `https://www.youtube.com/watch?v=${parsedTrailers[0].source}`
-  }] : [];
+
+  // Force trailers to be external links
+  const trailerStreams = []; // Android TV zal hierdoor niet intern proberen af te spelen
+  parsedTrailers.forEach(tr => {
+    tr.externalUrl = `https://www.youtube.com/watch?v=${tr.source}`;
+  });
 
   return {
     id: `tmdb:${tmdbId}`,
@@ -120,10 +119,10 @@ const buildMovieResponse = async (res, type, language, tmdbId, rpdbkey) => {
     background: res.backdrop_path ? `https://image.tmdb.org/t/p/original${res.backdrop_path}` : null,
     logo: processLogo(logo),
     trailers: parsedTrailers,
-    trailerStreams: parsedTrailerStreams,
+    trailerStreams,
     links: buildLinks(imdbRating, res.external_ids?.imdb_id, res.title, type, res.genres, res.credits, language),
     behaviorHints: {
-      defaultVideoId: parsedTrailerStreams[0]?.ytId || (res.external_ids?.imdb_id || `tmdb:${tmdbId}`),
+      defaultVideoId: null, // voorkomt interne afspelen
       hasScheduledVideos: false
     },
     app_extras: {
@@ -133,7 +132,6 @@ const buildMovieResponse = async (res, type, language, tmdbId, rpdbkey) => {
 };
 
 /* -------------------- TV SHOW -------------------- */
-
 const fetchTvData = async (tmdbId, language) => {
   return await moviedb.tvInfo({
     id: tmdbId,
@@ -163,12 +161,12 @@ const buildTvResponse = async (res, type, language, tmdbId, rpdbkey, config) => 
   await ensureVideosForLanguage(res, tmdbId, false);
 
   const parsedTrailers = Utils.parseTrailers(res.videos);
-  const parsedTrailerStreams = parsedTrailers.length > 0 ? [{
-    title: parsedTrailers[0].name || "Trailer",
-    ytId: parsedTrailers[0].source,
-    url: null,
-    externalUrl: `https://www.youtube.com/watch?v=${parsedTrailers[0].source}`
-  }] : [];
+
+  // Force trailers to be external links
+  const trailerStreams = [];
+  parsedTrailers.forEach(tr => {
+    tr.externalUrl = `https://www.youtube.com/watch?v=${tr.source}`;
+  });
 
   return {
     id: `tmdb:${tmdbId}`,
@@ -192,10 +190,10 @@ const buildTvResponse = async (res, type, language, tmdbId, rpdbkey, config) => 
     logo: processLogo(logo),
     videos: episodes || [],
     trailers: parsedTrailers,
-    trailerStreams: parsedTrailerStreams,
+    trailerStreams,
     links: buildLinks(imdbRating, res.external_ids?.imdb_id, res.name, type, res.genres, res.credits, language),
     behaviorHints: {
-      defaultVideoId: parsedTrailerStreams[0]?.ytId || null,
+      defaultVideoId: null, // voorkomt interne afspelen
       hasScheduledVideos: true
     },
     app_extras: {
@@ -205,7 +203,6 @@ const buildTvResponse = async (res, type, language, tmdbId, rpdbkey, config) => 
 };
 
 /* -------------------- MAIN FUNCTION -------------------- */
-
 async function getMeta(type, language, tmdbId, rpdbkey, config = {}) {
   const cacheKey = getCacheKey(type, language, tmdbId, rpdbkey);
   const cachedData = cache.get(cacheKey);
