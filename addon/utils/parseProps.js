@@ -40,8 +40,8 @@ function parseSlug(type, title, imdb_id) {
 /*
   Trailer selection & prioritization logic to reduce "noise" (reviews/shorts/clips/etc.)
   - Exclude items whose title contains blacklisted keywords (review, reaction, short, clip, scene, fan, etc.)
-  - Score items and sort by score: official + type 'Trailer' + size + title contains 'trailer'
-  - Deduplicate by YouTube key
+  - Score items and sort by score: official + type 'Trailer' + title contains 'trailer' + size/resolution
+  - Deduplicate by YouTube key and keep the best-scored item
 */
 
 // Keywords that indicate non-trailer content
@@ -59,7 +59,10 @@ const EXCLUDE_KEYWORDS = [
   "fan",
   "spoiler",
   "interview",
-  "featurette"
+  "featurette",
+  "reaction",
+  "behind the scenes",
+  "bts"
 ];
 
 function titleHasExcludedKeyword(title = "") {
@@ -69,66 +72,61 @@ function titleHasExcludedKeyword(title = "") {
 
 function scoreVideoItem(el) {
   let score = 0;
-
   if (!el) return score;
 
   // official flag is strong indicator
-  if (el.official === true) score += 100;
+  if (el.official === true) score += 200;
 
   // type preference
-  if (el.type === "Trailer") score += 50;
-  else if (el.type === "Teaser") score += 20;
+  if (el.type === "Trailer") score += 100;
+  else if (el.type === "Teaser") score += 40;
   else if (el.type === "Featurette") score += 10;
 
   // title contains 'trailer' is a positive sign
-  if (el.name && /trailer/i.test(el.name)) score += 10;
+  if (el.name && /trailer/i.test(el.name)) score += 25;
 
-  // prefer larger sizes (numerical)
+  // prefer larger sizes (if available)
   if (el.size && Number(el.size)) {
-    score += Math.min(Number(el.size), 2160) / 10; // normalized contribution
+    score += Math.min(Number(el.size), 2160) / 20; // normalized
   }
 
-  // language preference: prefer en or unspecified (slight)
+  // language preference: prefer en
   if (el.iso_639_1 && String(el.iso_639_1).toLowerCase() === "en") score += 5;
 
   // penalize if title likely indicates non-trailer
-  if (titleHasExcludedKeyword(el.name)) score -= 200;
+  if (titleHasExcludedKeyword(el.name)) score -= 500;
 
   return score;
 }
 
-// Return parsed trailers prioritized and filtered
+// Build invidious watch url if INVIDIOUS_BASE env var is provided (optional)
+function getInvidiousWatchUrl(ytId) {
+  const base = process.env.INVIDIOUS_BASE;
+  if (!base) return null;
+  return `${base.replace(/\/$/, '')}/watch?v=${encodeURIComponent(ytId)}`;
+}
+
+// Parse trailers: return prioritized, filtered trailer metadata
 function parseTrailers(videos) {
   if (!videos || !Array.isArray(videos.results)) return [];
 
-  // map to items with score
-  const items = videos.results
-    .filter((el) => el && el.site && typeof el.site === "string" && el.site.toLowerCase() === "youtube")
+  const candidates = videos.results
+    .filter((el) => el && el.site && String(el.site).toLowerCase() === "youtube")
     .filter((el) => el && el.key)
-    .map(el => {
-      return {
-        raw: el,
-        key: el.key,
-        score: scoreVideoItem(el)
-      };
-    })
-    // remove items with very low score (likely non-trailer)
-    .filter(item => item.score > -100)
-    // dedupe by key - keep best scored one
-    .reduce((acc, item) => {
-      if (!acc.map[item.key] || acc.map[item.key].score < item.score) {
-        acc.map[item.key] = item;
-      }
-      return acc;
-    }, { map: {} });
+    .map(el => ({ raw: el, key: el.key, score: scoreVideoItem(el) }))
+    .filter(item => item.score > -300); // drop very negative items
 
-  // convert back to array
-  const deduped = Object.values(items.map);
+  // dedupe by key keeping highest scored
+  const map = {};
+  for (const item of candidates) {
+    if (!map[item.key] || map[item.key].score < item.score) {
+      map[item.key] = item;
+    }
+  }
 
-  // sort by descending score
+  const deduped = Object.values(map);
   deduped.sort((a, b) => b.score - a.score);
 
-  // map to the expected trailer metadata structure, keep richer fields
   return deduped.map(entry => {
     const el = entry.raw;
     return {
@@ -139,47 +137,57 @@ function parseTrailers(videos) {
       source: el.key,
       official: el.official === true,
       size: el.size || null,
-      // keep iso fields so callers can make language decisions if desired
       iso_639_1: el.iso_639_1 || null,
       iso_3166_1: el.iso_3166_1 || null
     };
   });
 }
 
-// For playable streams, return minimal structure Stremio expects: title + ytId
+// parseTrailerStream: minimal structure for Stremio ({title, ytId}), but include fallback urls many Android clients accept
 function parseTrailerStream(videos) {
   if (!videos || !Array.isArray(videos.results)) return [];
 
-  const items = videos.results
-    .filter((el) => el && el.site && typeof el.site === "string" && el.site.toLowerCase() === "youtube")
+  const candidates = videos.results
+    .filter((el) => el && el.site && String(el.site).toLowerCase() === "youtube")
     .filter((el) => el && el.key)
-    .map(el => ({
-      raw: el,
-      key: el.key,
-      score: scoreVideoItem(el)
-    }))
-    .filter(item => item.score > -100)
-    .reduce((acc, item) => {
-      if (!acc.map[item.key] || acc.map[item.key].score < item.score) {
-        acc.map[item.key] = item;
-      }
-      return acc;
-    }, { map: {} });
+    .map(el => ({ raw: el, key: el.key, score: scoreVideoItem(el) }))
+    .filter(item => item.score > -300);
 
-  const deduped = Object.values(items.map);
+  // dedupe by key keeping highest scored
+  const map = {};
+  for (const item of candidates) {
+    if (!map[item.key] || map[item.key].score < item.score) {
+      map[item.key] = item;
+    }
+  }
 
+  const deduped = Object.values(map);
   deduped.sort((a, b) => b.score - a.score);
 
-  return deduped.map(entry => {
+  const invidiousBase = !!process.env.INVIDIOUS_BASE;
+
+  const streams = deduped.map(entry => {
     const el = entry.raw;
-    return {
+    const ytId = el.key;
+    const obj = {
       title: el.name || "Trailer",
-      ytId: el.key
+      ytId: ytId
     };
+    // Many Android clients accept url/embedUrl fallback; add them (no proxy)
+    obj.url = `https://www.youtube.com/watch?v=${ytId}`;
+    obj.embedUrl = `https://www.youtube.com/embed/${ytId}?rel=0`;
+    // optional Invidious fallback
+    if (invidiousBase) {
+      const iv = getInvidiousWatchUrl(ytId);
+      if (iv) obj.invidiousUrl = iv;
+    }
+    return obj;
   });
+
+  return streams;
 }
 
-// optional: still produce external links (kept for compatibility / fallback)
+// produce external links (deep link + web fallback)
 function parseTrailerLinks(videos) {
   if (!videos || !Array.isArray(videos.results)) return [];
 
@@ -195,10 +203,19 @@ function parseTrailerLinks(videos) {
     seen.add(key);
 
     const name = el.name || "Trailer";
+    const appDeepLink = `youtube://watch?v=${key}`;
+    const webUrl = `https://www.youtube.com/watch?v=${key}`;
+
     links.push({
-      name,
+      name: `${name} (YouTube app)`,
       category: "Trailer",
-      url: `https://www.youtube.com/watch?v=${key}`,
+      url: appDeepLink,
+    });
+
+    links.push({
+      name: `${name} (Web)`,
+      category: "Trailer",
+      url: webUrl,
     });
   }
 
