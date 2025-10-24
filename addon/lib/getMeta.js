@@ -4,7 +4,7 @@ const Utils = require("../utils/parseProps");
 const moviedb = new MovieDb(process.env.TMDB_API);
 const { getEpisodes } = require("./getEpisodes");
 const { getLogo, getTvLogo } = require("./getLogo");
-const { getCachedImdbRating } = require("./getImdbRating"); // aangepast naar helper
+const { getImdbRating } = require("./getImdbRating");
 
 // Configuration
 const CACHE_TTL = 1000 * 60 * 60; // 1 hour
@@ -17,7 +17,7 @@ async function getCachedImdbRating(imdbId, type) {
   if (!imdbId) return null;
   if (imdbCache.has(imdbId)) return imdbCache.get(imdbId);
   try {
-    const rating = await getCachedImdbRating(imdbId, type);
+    const rating = await getImdbRating(imdbId, type);
     imdbCache.set(imdbId, rating);
     return rating;
   } catch (err) {
