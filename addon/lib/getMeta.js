@@ -8,11 +8,14 @@ const { getImdbRating } = require("./getImdbRating");
 
 // Configuration
 const CACHE_TTL = 1000 * 60 * 60; // 1 hour
-const blacklistLogoUrls = [ "https://assets.fanart.tv/fanart/tv/0/hdtvlogo/-60a02798b7eea.png" ];
+const blacklistLogoUrls = [
+  "https://assets.fanart.tv/fanart/tv/0/hdtvlogo/-60a02798b7eea.png"
+];
 
-// Cache
+// Caches
 const cache = new Map();
 const imdbCache = new Map();
+
 async function getCachedImdbRating(imdbId, type) {
   if (!imdbId) return null;
   if (imdbCache.has(imdbId)) return imdbCache.get(imdbId);
@@ -21,13 +24,13 @@ async function getCachedImdbRating(imdbId, type) {
     imdbCache.set(imdbId, rating);
     return rating;
   } catch (err) {
-    console.error(`Erro ao buscar IMDb rating para ${imdbId}:`, err.message);
+    console.error(`❌ Error fetching IMDb rating for ${imdbId}:`, err.message);
     return null;
   }
 }
 
 // Helper functions
-const getCacheKey = (type, language, tmdbId, rpdbkey) => 
+const getCacheKey = (type, language, tmdbId, rpdbkey) =>
   `${type}-${language}-${tmdbId}-${rpdbkey}`;
 
 const processLogo = (logo) => {
@@ -42,32 +45,30 @@ const buildLinks = (imdbRating, imdbId, title, type, genres, credits, language) 
   ...Utils.parseCreditsLink(credits)
 ];
 
-// If videos are empty for the requested language, try a fallback to en-US and use those videos.
-// This improves trailer availability when TMDB only has trailers in en-US.
+// Fallback video fetch for trailers
 async function ensureVideosForLanguage(res, tmdbId, isMovie = true) {
   try {
-    const hasVideos = res && res.videos && Array.isArray(res.videos.results) && res.videos.results.length > 0;
+    const hasVideos =
+      res && res.videos && Array.isArray(res.videos.results) && res.videos.results.length > 0;
     if (hasVideos) return;
 
-    // Fetch videos explicitly in en-US as a fallback
+    const fallbackLang = "en-US";
     if (isMovie && typeof moviedb.movieVideos === "function") {
-      const videosRes = await moviedb.movieVideos({ id: tmdbId, language: "en-US" });
-      if (videosRes && Array.isArray(videosRes.results) && videosRes.results.length > 0) {
+      const videosRes = await moviedb.movieVideos({ id: tmdbId, language: fallbackLang });
+      if (videosRes && Array.isArray(videosRes.results) && videosRes.results.length > 0)
         res.videos = videosRes;
-      }
     } else if (!isMovie && typeof moviedb.tvVideos === "function") {
-      const videosRes = await moviedb.tvVideos({ id: tmdbId, language: "en-US" });
-      if (videosRes && Array.isArray(videosRes.results) && videosRes.results.length > 0) {
+      const videosRes = await moviedb.tvVideos({ id: tmdbId, language: fallbackLang });
+      if (videosRes && Array.isArray(videosRes.results) && videosRes.results.length > 0)
         res.videos = videosRes;
-      }
     }
   } catch (e) {
-    // Do not fail the meta call just because fallback failed; log for debugging.
-    console.warn(`Fallback video fetch failed for ${tmdbId}:`, e.message);
+    console.warn(`⚠️ Fallback video fetch failed for ${tmdbId}:`, e.message);
   }
 }
 
-// Movie specific functions
+/* -------------------- MOVIE -------------------- */
+
 const fetchMovieData = async (tmdbId, language) => {
   return await moviedb.movieInfo({
     id: tmdbId,
@@ -80,7 +81,7 @@ const buildMovieResponse = async (res, type, language, tmdbId, rpdbkey) => {
   const [poster, logo, imdbRatingRaw] = await Promise.all([
     Utils.parsePoster(type, tmdbId, res.poster_path, language, rpdbkey),
     getLogo(tmdbId, language, res.original_language).catch(e => {
-      console.warn(`Erro ao buscar logo para filme ${tmdbId}:`, e.message);
+      console.warn(`⚠️ Error fetching logo for movie ${tmdbId}:`, e.message);
       return null;
     }),
     getCachedImdbRating(res.external_ids?.imdb_id, type),
@@ -88,48 +89,51 @@ const buildMovieResponse = async (res, type, language, tmdbId, rpdbkey) => {
 
   const imdbRating = imdbRatingRaw || res.vote_average?.toFixed(1) || "N/A";
 
-  // Ensure videos exist (fallback to en-US if needed) before parsing trailers
   await ensureVideosForLanguage(res, tmdbId, true);
 
-  // Parse trailers and trailerStreams (no direct youtube.com URLs in trailerStreams)
   const parsedTrailers = Utils.parseTrailers(res.videos);
-  const parsedTrailerStreams = Utils.parseTrailerStream(res.videos);
+  const parsedTrailerStreams = parsedTrailers.length > 0 ? [{
+    title: parsedTrailers[0].name || "Trailer",
+    ytId: parsedTrailers[0].source,
+    url: null,
+    externalUrl: `https://www.youtube.com/watch?v=${parsedTrailers[0].source}`
+  }] : [];
 
   return {
-    imdb_id: res.imdb_id,
-    country: Utils.parseCoutry(res.production_countries),
-    description: res.overview,
-    director: Utils.parseDirector(res.credits),
-    genre: Utils.parseGenres(res.genres),
-    imdbRating,
-    name: res.title,
-    released: new Date(res.release_date),
-    slug: Utils.parseSlug(type, res.title, res.imdb_id),
+    id: `tmdb:${tmdbId}`,
     type,
+    name: res.title,
+    imdb_id: res.external_ids?.imdb_id || res.imdb_id || null,
+    imdbRating,
+    description: res.overview,
+    genre: Utils.parseGenres(res.genres),
+    genres: Utils.parseGenres(res.genres),
+    director: Utils.parseDirector(res.credits),
     writer: Utils.parseWriter(res.credits),
+    released: res.release_date ? new Date(res.release_date) : null,
+    releaseInfo: res.release_date ? res.release_date.substr(0, 4) : "",
     year: res.release_date ? res.release_date.substr(0, 4) : "",
-    // Provide trailers + trailerStreams where trailerStreams contain {title, ytId}
+    runtime: Utils.parseRunTime(res.runtime),
+    country: Utils.parseCoutry(res.production_countries),
+    slug: Utils.parseSlug(type, res.title, res.external_ids?.imdb_id),
+    poster,
+    background: res.backdrop_path ? `https://image.tmdb.org/t/p/original${res.backdrop_path}` : null,
+    logo: processLogo(logo),
     trailers: parsedTrailers,
     trailerStreams: parsedTrailerStreams,
-    background: `https://image.tmdb.org/t/p/original${res.backdrop_path}`,
-    poster,
-    runtime: Utils.parseRunTime(res.runtime),
-    id: `tmdb:${tmdbId}`,
-    genres: Utils.parseGenres(res.genres),
-    releaseInfo: res.release_date ? res.release_date.substr(0, 4) : "",
-    links: buildLinks(imdbRating, res.imdb_id, res.title, type, res.genres, res.credits, language),
+    links: buildLinks(imdbRating, res.external_ids?.imdb_id, res.title, type, res.genres, res.credits, language),
     behaviorHints: {
-      defaultVideoId: res.imdb_id ? res.imdb_id : `tmdb:${res.id}`,
+      defaultVideoId: parsedTrailerStreams[0]?.ytId || (res.external_ids?.imdb_id || `tmdb:${tmdbId}`),
       hasScheduledVideos: false
     },
-    logo: processLogo(logo),
     app_extras: {
       cast: Utils.parseCast(res.credits)
     }
   };
 };
 
-// TV show specific functions
+/* -------------------- TV SHOW -------------------- */
+
 const fetchTvData = async (tmdbId, language) => {
   return await moviedb.tvInfo({
     id: tmdbId,
@@ -144,79 +148,82 @@ const buildTvResponse = async (res, type, language, tmdbId, rpdbkey, config) => 
   const [poster, logo, imdbRatingRaw, episodes] = await Promise.all([
     Utils.parsePoster(type, tmdbId, res.poster_path, language, rpdbkey),
     getTvLogo(res.external_ids?.tvdb_id, res.id, language, res.original_language).catch(e => {
-      console.warn(`Erro ao buscar logo para série ${tmdbId}:`, e.message);
+      console.warn(`⚠️ Error fetching logo for show ${tmdbId}:`, e.message);
       return null;
     }),
     getCachedImdbRating(res.external_ids?.imdb_id, type),
-    getEpisodes(language, tmdbId, res.external_ids?.imdb_id, res.seasons, {
-      hideEpisodeThumbnails: config.hideEpisodeThumbnails
-    }).catch(e => {
-      console.warn(`Erro ao buscar episódios da série ${tmdbId}:`, e.message);
+    getEpisodes(language, tmdbId, res.external_ids?.imdb_id, res.seasons, { hideEpisodeThumbnails: config.hideEpisodeThumbnails }).catch(e => {
+      console.warn(`⚠️ Error fetching episodes for show ${tmdbId}:`, e.message);
       return [];
     })
   ]);
 
   const imdbRating = imdbRatingRaw || res.vote_average?.toFixed(1) || "N/A";
 
-  // Ensure videos exist (fallback to en-US if needed) before parsing trailers
   await ensureVideosForLanguage(res, tmdbId, false);
 
   const parsedTrailers = Utils.parseTrailers(res.videos);
-  const parsedTrailerStreams = Utils.parseTrailerStream(res.videos);
+  const parsedTrailerStreams = parsedTrailers.length > 0 ? [{
+    title: parsedTrailers[0].name || "Trailer",
+    ytId: parsedTrailers[0].source,
+    url: null,
+    externalUrl: `https://www.youtube.com/watch?v=${parsedTrailers[0].source}`
+  }] : [];
 
   return {
-    country: Utils.parseCoutry(res.production_countries),
+    id: `tmdb:${tmdbId}`,
+    type,
+    name: res.name,
+    imdb_id: res.external_ids?.imdb_id || null,
+    imdbRating,
     description: res.overview,
     genre: Utils.parseGenres(res.genres),
-    imdbRating,
-    imdb_id: res.external_ids.imdb_id,
-    name: res.name,
-    poster,
-    released: new Date(res.first_air_date),
+    genres: Utils.parseGenres(res.genres),
+    writer: Utils.parseCreatedBy(res.created_by),
+    released: res.first_air_date ? new Date(res.first_air_date) : null,
+    releaseInfo: Utils.parseYear(res.status, res.first_air_date, res.last_air_date),
+    year: Utils.parseYear(res.status, res.first_air_date, res.last_air_date),
     runtime: Utils.parseRunTime(runtime),
     status: res.status,
-    type,
-    writer: Utils.parseCreatedBy(res.created_by),
-    year: Utils.parseYear(res.status, res.first_air_date, res.last_air_date),
-    background: `https://image.tmdb.org/t/p/original${res.backdrop_path}`,
-    slug: Utils.parseSlug(type, res.name, res.external_ids.imdb_id),
-    id: `tmdb:${tmdbId}`,
-    genres: Utils.parseGenres(res.genres),
-    releaseInfo: Utils.parseYear(res.status, res.first_air_date, res.last_air_date),
+    country: Utils.parseCoutry(res.production_countries),
+    slug: Utils.parseSlug(type, res.name, res.external_ids?.imdb_id),
+    poster,
+    background: res.backdrop_path ? `https://image.tmdb.org/t/p/original${res.backdrop_path}` : null,
+    logo: processLogo(logo),
     videos: episodes || [],
-    links: buildLinks(imdbRating, res.external_ids.imdb_id, res.name, type, res.genres, res.credits, language),
     trailers: parsedTrailers,
     trailerStreams: parsedTrailerStreams,
+    links: buildLinks(imdbRating, res.external_ids?.imdb_id, res.name, type, res.genres, res.credits, language),
     behaviorHints: {
-      defaultVideoId: null,
+      defaultVideoId: parsedTrailerStreams[0]?.ytId || null,
       hasScheduledVideos: true
     },
-    logo: processLogo(logo),
     app_extras: {
       cast: Utils.parseCast(res.credits)
     }
   };
 };
 
-// Main function
+/* -------------------- MAIN FUNCTION -------------------- */
+
 async function getMeta(type, language, tmdbId, rpdbkey, config = {}) {
   const cacheKey = getCacheKey(type, language, tmdbId, rpdbkey);
   const cachedData = cache.get(cacheKey);
-  
-  if (cachedData && (Date.now() - cachedData.timestamp) < CACHE_TTL) {
-    return Promise.resolve({ meta: cachedData.data });
+
+  if (cachedData && Date.now() - cachedData.timestamp < CACHE_TTL) {
+    return { meta: cachedData.data };
   }
 
   try {
-    const meta = await (type === "movie" ? 
-      fetchMovieData(tmdbId, language).then(res => buildMovieResponse(res, type, language, tmdbId, rpdbkey)) :
-      fetchTvData(tmdbId, language).then(res => buildTvResponse(res, type, language, tmdbId, rpdbkey, config))
+    const meta = await (type === "movie"
+      ? fetchMovieData(tmdbId, language).then(res => buildMovieResponse(res, type, language, tmdbId, rpdbkey))
+      : fetchTvData(tmdbId, language).then(res => buildTvResponse(res, type, language, tmdbId, rpdbkey, config))
     );
 
     cache.set(cacheKey, { data: meta, timestamp: Date.now() });
-    return Promise.resolve({ meta });
+    return { meta };
   } catch (error) {
-    console.error(`Error in getMeta: ${error.message}`);
+    console.error(`❌ Error in getMeta(${type}:${tmdbId}): ${error.message}`);
     throw error;
   }
 }
