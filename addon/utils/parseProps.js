@@ -44,7 +44,6 @@ function parseSlug(type, title, imdb_id) {
   - Deduplicate by YouTube key and keep the best-scored item
 */
 
-// Keywords that indicate non-trailer content
 const EXCLUDE_KEYWORDS = [
   "review",
   "reaction",
@@ -60,7 +59,6 @@ const EXCLUDE_KEYWORDS = [
   "spoiler",
   "interview",
   "featurette",
-  "reaction",
   "behind the scenes",
   "bts"
 ];
@@ -74,26 +72,20 @@ function scoreVideoItem(el) {
   let score = 0;
   if (!el) return score;
 
-  // official flag is strong indicator
   if (el.official === true) score += 200;
 
-  // type preference
   if (el.type === "Trailer") score += 100;
   else if (el.type === "Teaser") score += 40;
   else if (el.type === "Featurette") score += 10;
 
-  // title contains 'trailer' is a positive sign
   if (el.name && /trailer/i.test(el.name)) score += 25;
 
-  // prefer larger sizes (if available)
   if (el.size && Number(el.size)) {
-    score += Math.min(Number(el.size), 2160) / 20; // normalized
+    score += Math.min(Number(el.size), 2160) / 20;
   }
 
-  // language preference: prefer en
   if (el.iso_639_1 && String(el.iso_639_1).toLowerCase() === "en") score += 5;
 
-  // penalize if title likely indicates non-trailer
   if (titleHasExcludedKeyword(el.name)) score -= 500;
 
   return score;
@@ -114,9 +106,8 @@ function parseTrailers(videos) {
     .filter((el) => el && el.site && String(el.site).toLowerCase() === "youtube")
     .filter((el) => el && el.key)
     .map(el => ({ raw: el, key: el.key, score: scoreVideoItem(el) }))
-    .filter(item => item.score > -300); // drop very negative items
+    .filter(item => item.score > -300);
 
-  // dedupe by key keeping highest scored
   const map = {};
   for (const item of candidates) {
     if (!map[item.key] || map[item.key].score < item.score) {
@@ -143,7 +134,9 @@ function parseTrailers(videos) {
   });
 }
 
-// parseTrailerStream: minimal structure for Stremio ({title, ytId}), but include fallback urls many Android clients accept
+// parseTrailerStream: MINIMAL structure Stremio expects: { title, ytId }
+// IMPORTANT: do NOT include youtube watch URLs here to avoid CORS blocks in web clients.
+// Android clients that accept ytId should still play natively.
 function parseTrailerStream(videos) {
   if (!videos || !Array.isArray(videos.results)) return [];
 
@@ -153,7 +146,6 @@ function parseTrailerStream(videos) {
     .map(el => ({ raw: el, key: el.key, score: scoreVideoItem(el) }))
     .filter(item => item.score > -300);
 
-  // dedupe by key keeping highest scored
   const map = {};
   for (const item of candidates) {
     if (!map[item.key] || map[item.key].score < item.score) {
@@ -164,27 +156,13 @@ function parseTrailerStream(videos) {
   const deduped = Object.values(map);
   deduped.sort((a, b) => b.score - a.score);
 
-  const invidiousBase = !!process.env.INVIDIOUS_BASE;
-
-  const streams = deduped.map(entry => {
+  return deduped.map(entry => {
     const el = entry.raw;
-    const ytId = el.key;
-    const obj = {
+    return {
       title: el.name || "Trailer",
-      ytId: ytId
+      ytId: el.key
     };
-    // Many Android clients accept url/embedUrl fallback; add them (no proxy)
-    obj.url = `https://www.youtube.com/watch?v=${ytId}`;
-    obj.embedUrl = `https://www.youtube.com/embed/${ytId}?rel=0`;
-    // optional Invidious fallback
-    if (invidiousBase) {
-      const iv = getInvidiousWatchUrl(ytId);
-      if (iv) obj.invidiousUrl = iv;
-    }
-    return obj;
   });
-
-  return streams;
 }
 
 // produce external links (deep link + web fallback)
