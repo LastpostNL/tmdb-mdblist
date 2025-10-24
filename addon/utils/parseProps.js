@@ -37,135 +37,31 @@ function parseSlug(type, title, imdb_id) {
     }`;
 }
 
-/*
-  Trailer selection & prioritization logic to reduce "noise" (reviews/shorts/clips/etc.)
-  - Exclude items whose title contains blacklisted keywords (review, reaction, short, clip, scene, fan, etc.)
-  - Score items and sort by score: official + type 'Trailer' + title contains 'trailer' + size/resolution
-  - Deduplicate by YouTube key and keep the best-scored item
-*/
-
-const EXCLUDE_KEYWORDS = [
-  "review",
-  "reaction",
-  "analysis",
-  "breakdown",
-  "essay",
-  "discussion",
-  "shorts",
-  "short",
-  "scene",
-  "clip",
-  "fan",
-  "spoiler",
-  "interview",
-  "featurette",
-  "behind the scenes",
-  "bts"
-];
-
-function titleHasExcludedKeyword(title = "") {
-  const t = String(title).toLowerCase();
-  return EXCLUDE_KEYWORDS.some(k => t.includes(k));
-}
-
-function scoreVideoItem(el) {
-  let score = 0;
-  if (!el) return score;
-
-  if (el.official === true) score += 200;
-
-  if (el.type === "Trailer") score += 100;
-  else if (el.type === "Teaser") score += 40;
-  else if (el.type === "Featurette") score += 10;
-
-  if (el.name && /trailer/i.test(el.name)) score += 25;
-
-  if (el.size && Number(el.size)) {
-    score += Math.min(Number(el.size), 2160) / 20;
-  }
-
-  if (el.iso_639_1 && String(el.iso_639_1).toLowerCase() === "en") score += 5;
-
-  if (titleHasExcludedKeyword(el.name)) score -= 500;
-
-  return score;
-}
-
-// Build invidious watch url if INVIDIOUS_BASE env var is provided (optional)
-function getInvidiousWatchUrl(ytId) {
-  const base = process.env.INVIDIOUS_BASE;
-  if (!base) return null;
-  return `${base.replace(/\/$/, '')}/watch?v=${encodeURIComponent(ytId)}`;
-}
-
-// Parse trailers: return prioritized, filtered trailer metadata
 function parseTrailers(videos) {
-  if (!videos || !Array.isArray(videos.results)) return [];
-
-  const candidates = videos.results
-    .filter((el) => el && el.site && String(el.site).toLowerCase() === "youtube")
-    .filter((el) => el && el.key)
-    .map(el => ({ raw: el, key: el.key, score: scoreVideoItem(el) }))
-    .filter(item => item.score > -300);
-
-  const map = {};
-  for (const item of candidates) {
-    if (!map[item.key] || map[item.key].score < item.score) {
-      map[item.key] = item;
-    }
-  }
-
-  const deduped = Object.values(map);
-  deduped.sort((a, b) => b.score - a.score);
-
-  return deduped.map(entry => {
-    const el = entry.raw;
-    return {
-      id: `youtube:${el.key}`,
-      name: el.name || "Trailer",
-      type: el.type || "Trailer",
-      site: el.site || "YouTube",
-      source: el.key,
-      official: el.official === true,
-      size: el.size || null,
-      iso_639_1: el.iso_639_1 || null,
-      iso_3166_1: el.iso_3166_1 || null
-    };
-  });
+  return videos.results
+    .filter((el) => el.site === "YouTube")
+    .filter((el) => el.type === "Trailer")
+    .map((el) => {
+      return {
+        source: `${el.key}`,
+        type: `${el.type}`,
+      };
+    });
 }
 
-// parseTrailerStream: MINIMAL structure Stremio expects: { title, ytId }
-// IMPORTANT: do NOT include youtube watch URLs here to avoid CORS blocks in web clients.
-// Android clients that accept ytId should still play natively.
 function parseTrailerStream(videos) {
-  if (!videos || !Array.isArray(videos.results)) return [];
-
-  const candidates = videos.results
-    .filter((el) => el && el.site && String(el.site).toLowerCase() === "youtube")
-    .filter((el) => el && el.key)
-    .map(el => ({ raw: el, key: el.key, score: scoreVideoItem(el) }))
-    .filter(item => item.score > -300);
-
-  const map = {};
-  for (const item of candidates) {
-    if (!map[item.key] || map[item.key].score < item.score) {
-      map[item.key] = item;
-    }
-  }
-
-  const deduped = Object.values(map);
-  deduped.sort((a, b) => b.score - a.score);
-
-  return deduped.map(entry => {
-    const el = entry.raw;
-    return {
-      title: el.name || "Trailer",
-      ytId: el.key
-    };
-  });
+  return videos.results
+    .filter((el) => el.site === "YouTube")
+    .filter((el) => el.key)
+    .map((el) => {
+      return {
+        title: `${el.name}`,
+        ytId: `${el.key}`,
+      };
+    });
 }
 
-// produce external links (deep link + web fallback)
+// Links use youtube-nocookie.com to reduce tracking and avoid direct youtube.com probes
 function parseTrailerLinks(videos) {
   if (!videos || !Array.isArray(videos.results)) return [];
 
@@ -181,8 +77,9 @@ function parseTrailerLinks(videos) {
     seen.add(key);
 
     const name = el.name || "Trailer";
+    // Use youtube-nocookie domains for privacy
     const appDeepLink = `youtube://watch?v=${key}`;
-    const webUrl = `https://www.youtube.com/watch?v=${key}`;
+    const webUrl = `https://www.youtube-nocookie.com/watch?v=${key}`;
 
     links.push({
       name: `${name} (YouTube app)`,
@@ -334,7 +231,6 @@ function parseMedia(el, type, genreList = []) {
     description: el.overview,
   };
 }
-
 function getRpdbPoster(type, id, language, rpdbkey) {
   const tier = rpdbkey.split("-")[0]
   const lang = language.split("-")[0]
