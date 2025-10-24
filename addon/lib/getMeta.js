@@ -91,7 +91,7 @@ const buildMovieResponse = async (res, type, language, tmdbId, rpdbkey) => {
   // Ensure videos exist (fallback to en-US if needed) before parsing trailers
   await ensureVideosForLanguage(res, tmdbId, true);
 
-  // Parse trailers and trailerStreams (parseTrailerStream now includes url/embedUrl)
+  // Parse trailers and trailerStreams
   const parsedTrailers = Utils.parseTrailers(res.videos);
   const parsedTrailerStreams = Utils.parseTrailerStream(res.videos);
   const trailerLinks = Utils.parseTrailerLinks(res.videos);
@@ -115,7 +115,7 @@ const buildMovieResponse = async (res, type, language, tmdbId, rpdbkey) => {
     type,
     writer: Utils.parseWriter(res.credits),
     year: res.release_date ? res.release_date.substr(0, 4) : "",
-    // Provide trailers + trailerStreams (title, ytId, url, embedUrl) so clients can choose best available method
+    // Provide trailers + trailerStreams (minimal)
     trailers: parsedTrailers,
     trailerStreams: parsedTrailerStreams,
     background: `https://image.tmdb.org/t/p/original${res.backdrop_path}`,
