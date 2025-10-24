@@ -50,6 +50,16 @@ const buildTrailerLinks = (trailerStreams) => {
     .join("\n");
 };
 
+// Build full summary with directors, cast, overview, and trailers
+const buildSummaryWithTrailers = (overview, directors, cast, trailerStreams) => {
+  const directorLine = directors && directors.length ? `Director${directors.length > 1 ? 's' : ''}: ${directors.join(', ')}` : '';
+  const castLine = cast && cast.length ? `Cast: ${cast.join(', ')}` : '';
+  const trailerLines = trailerStreams && trailerStreams.length
+    ? 'Trailers:\n' + trailerStreams.map(t => `- [${t.title}](https://www.youtube.com/watch?v=${t.ytId})`).join('\n')
+    : '';
+  return [directorLine, castLine, overview || '', trailerLines].filter(Boolean).join('\n\n');
+};
+
 // Ensure videos exist for language fallback
 async function ensureVideosForLanguage(res, tmdbId, isMovie = true) {
   try {
@@ -98,13 +108,21 @@ const buildMovieResponse = async (res, type, language, tmdbId, rpdbkey) => {
   const parsedTrailers = Utils.parseTrailers(res.videos);
   const parsedTrailerStreams = Utils.parseTrailerStream(res.videos);
 
-  const summaryWithTrailers = `${res.overview || ""}\n\nTrailers:\n${buildTrailerLinks(parsedTrailerStreams)}`;
+  const directors = Utils.parseDirector(res.credits);
+  const cast = Utils.parseCast(res.credits);
+
+  const summaryWithTrailers = buildSummaryWithTrailers(
+    res.overview,
+    directors,
+    cast,
+    parsedTrailerStreams
+  );
 
   return {
     imdb_id: res.imdb_id,
     country: Utils.parseCoutry(res.production_countries),
     description: res.overview,
-    director: Utils.parseDirector(res.credits),
+    director: directors,
     genre: Utils.parseGenres(res.genres),
     imdbRating,
     name: res.title,
@@ -129,7 +147,7 @@ const buildMovieResponse = async (res, type, language, tmdbId, rpdbkey) => {
     },
     logo: processLogo(logo),
     app_extras: {
-      cast: Utils.parseCast(res.credits)
+      cast
     }
   };
 };
@@ -168,7 +186,15 @@ const buildTvResponse = async (res, type, language, tmdbId, rpdbkey, config) => 
   const parsedTrailers = Utils.parseTrailers(res.videos);
   const parsedTrailerStreams = Utils.parseTrailerStream(res.videos);
 
-  const summaryWithTrailers = `${res.overview || ""}\n\nTrailers:\n${buildTrailerLinks(parsedTrailerStreams)}`;
+  const directors = Utils.parseDirector(res.credits);
+  const cast = Utils.parseCast(res.credits);
+
+  const summaryWithTrailers = buildSummaryWithTrailers(
+    res.overview,
+    directors,
+    cast,
+    parsedTrailerStreams
+  );
 
   return {
     country: Utils.parseCoutry(res.production_countries),
@@ -199,9 +225,8 @@ const buildTvResponse = async (res, type, language, tmdbId, rpdbkey, config) => 
       hasScheduledVideos: true
     },
     logo: processLogo(logo),
-    app_extras: {
-      cast: Utils.parseCast(res.credits)
-    }
+    director: directors,
+    app_extras: { cast }
   };
 };
 
